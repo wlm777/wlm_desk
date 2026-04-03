@@ -5,10 +5,10 @@ RUN npm ci
 
 FROM node:20-alpine AS builder
 WORKDIR /app
+COPY package.json package-lock.json* ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV PATH=/app/node_modules/.bin:$PATH
-RUN next build
+RUN npx next build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
