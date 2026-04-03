@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Next.js
+frontend/.next/
+frontend/out/
+
+# Environment — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+!.env.production.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+
+# Attachments (local dev data)
+data/
+
+# Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+
+# Logs
+*.log
