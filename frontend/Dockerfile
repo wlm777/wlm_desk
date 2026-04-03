@@ -8,7 +8,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npx next build
+RUN ./node_modules/.bin/next build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
