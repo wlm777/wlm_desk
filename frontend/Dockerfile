@@ -1,21 +1,13 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci && \
-    echo "=== DEBUG: .bin contents ===" && \
-    ls -la node_modules/.bin/next 2>&1 || true && \
-    echo "=== DEBUG: next package ===" && \
-    ls -la node_modules/next/dist/bin/ 2>&1 || true && \
-    echo "=== DEBUG: npm ls ===" && \
-    npm ls next 2>&1 || true && \
-    echo "=== DEBUG: which next ===" && \
-    which next 2>&1 || true && \
-    echo "=== DEBUG: PATH ===" && \
-    echo $PATH && \
-    echo "=== DEBUG: node_modules/.bin listing ===" && \
-    ls node_modules/.bin/ | head -20 || true
+RUN npm ci
+RUN echo "=== .bin ===" && ls -la node_modules/.bin/next || true
+RUN echo "=== next pkg ===" && ls -la node_modules/next || true
+RUN echo "=== next bin ===" && ls -la node_modules/next/dist/bin || true
+RUN npm ls next
 COPY . .
-RUN node node_modules/next/dist/bin/next build
+RUN npm run build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
