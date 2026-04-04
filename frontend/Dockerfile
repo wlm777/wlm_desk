@@ -1,13 +1,21 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci
-RUN ls -la node_modules/.bin/next || echo "NO NEXT BINARY"
-RUN npm ls next || echo "NEXT NOT IN TREE"
-RUN find node_modules -maxdepth 3 -name "next" -type d | head -20
-RUN cat node_modules/.package-lock.json | grep -A5 '"next"' | head -20 || true
+RUN npm ci && \
+    echo "=== DEBUG: .bin contents ===" && \
+    ls -la node_modules/.bin/next 2>&1 || true && \
+    echo "=== DEBUG: next package ===" && \
+    ls -la node_modules/next/dist/bin/ 2>&1 || true && \
+    echo "=== DEBUG: npm ls ===" && \
+    npm ls next 2>&1 || true && \
+    echo "=== DEBUG: which next ===" && \
+    which next 2>&1 || true && \
+    echo "=== DEBUG: PATH ===" && \
+    echo $PATH && \
+    echo "=== DEBUG: node_modules/.bin listing ===" && \
+    ls node_modules/.bin/ | head -20 || true
 COPY . .
-RUN npm run build
+RUN node node_modules/next/dist/bin/next build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
