@@ -242,7 +242,14 @@ export default function UsersPage() {
                       <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: u.color || "#7BAE8A" }}>
                         {u.full_name.charAt(0)}
                       </div>
-                      <span className="text-sm text-gray-900 font-medium">{u.full_name}</span>
+                      <div>
+                        <span className="text-sm text-gray-900 font-medium">{u.full_name}</span>
+                        <p className="text-[10px] text-gray-400">
+                          {u.last_login_at
+                            ? `Last activity: ${new Date(u.last_login_at).toLocaleString()}`
+                            : "Never logged in"}
+                        </p>
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
@@ -279,6 +286,11 @@ export default function UsersPage() {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">{u.full_name}</p>
                 <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                <p className="text-[10px] text-gray-400 truncate">
+                  {u.last_login_at
+                    ? `Last activity: ${new Date(u.last_login_at).toLocaleString()}`
+                    : "Never logged in"}
+                </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full", ROLE_COLORS[u.role])}>{ROLE_LABELS[u.role]}</span>

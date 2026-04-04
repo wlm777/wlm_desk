@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Clock, AlertTriangle, FolderKanban, User as UserIcon } from "lucide-react";
+import { Clock, AlertTriangle, FolderKanban, User as UserIcon, UsersRound } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Header } from "@/components/header";
 import { api } from "@/lib/api";
@@ -26,6 +26,11 @@ export default function DashboardPage() {
   const { data: stuck, isLoading: stuckLoading } = useQuery<StuckTask[]>({
     queryKey: ["dashboard-stuck"],
     queryFn: () => api.get("/api/v1/dashboard/stuck"),
+  });
+
+  const { data: clientsWithCounts } = useQuery<{ id: string; name: string; company: string | null; project_count: number }[]>({
+    queryKey: ["clients-with-counts"],
+    queryFn: () => api.get("/api/v1/clients/with-counts"),
   });
 
   const cards = summary
@@ -197,6 +202,33 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* Clients */}
+        {clientsWithCounts && clientsWithCounts.length > 0 && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mt-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <UsersRound className="w-4 h-4 text-gray-400" />
+              Clients
+            </h2>
+            <div className="space-y-1">
+              {clientsWithCounts.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => router.push(`/projects?client=${c.id}`)}
+                  className="w-full flex items-center justify-between p-2 -mx-2 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center text-xs font-bold shrink-0">
+                      {c.name.charAt(0)}
+                    </div>
+                    <span className="text-sm text-gray-700">{c.name}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">{c.project_count} project{c.project_count !== 1 ? "s" : ""}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

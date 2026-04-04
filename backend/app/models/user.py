@@ -22,6 +22,7 @@ class User(UUIDMixin, TimestampMixin, Base):
     color: Mapped[str | None] = mapped_column(String(7), nullable=True)
     slack_user_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     last_digest_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Slack webhook notifications
     slack_webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)

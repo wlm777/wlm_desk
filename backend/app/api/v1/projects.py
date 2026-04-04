@@ -80,6 +80,8 @@ async def update_project(
     user: User = Depends(require_project_access),
     db: AsyncSession = Depends(get_db),
 ):
+    if user.role not in (UserRole.admin, UserRole.manager):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admin or manager can edit projects")
     project = await project_service.get_project(db, project_id)
     if not project:
         raise HTTPException(status.HTTP_404_NOT_FOUND)

@@ -10,6 +10,7 @@ class ProjectCreate(BaseModel):
     name: str
     description: str | None = None
     description_rich: dict | None = None
+    client_id: uuid.UUID | None = None
     member_ids: list[uuid.UUID] | None = None
 
 
@@ -19,6 +20,7 @@ class ProjectRead(BaseModel):
     description: str | None
     description_rich: dict | None = None
     owner_id: uuid.UUID
+    client_id: uuid.UUID | None = None
     is_archived: bool
     created_at: datetime
     updated_at: datetime
@@ -32,3 +34,4 @@ class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     description_rich: dict | None = None
+    client_id: uuid.UUID | None = None

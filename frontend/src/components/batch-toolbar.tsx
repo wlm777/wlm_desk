@@ -11,6 +11,7 @@ interface BatchToolbarProps {
   selectedIds: string[];
   projectId: string;
   onClear: () => void;
+  isArchived?: boolean;
 }
 
 interface BatchResult {
@@ -19,7 +20,7 @@ interface BatchResult {
   errors: { task_id: string; reason: string }[];
 }
 
-export function BatchToolbar({ selectedIds, projectId, onClear }: BatchToolbarProps) {
+export function BatchToolbar({ selectedIds, projectId, onClear, isArchived = false }: BatchToolbarProps) {
   const queryClient = useQueryClient();
   const [showResult, setShowResult] = useState<BatchResult | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -48,10 +49,25 @@ export function BatchToolbar({ selectedIds, projectId, onClear }: BatchToolbarPr
     },
   });
 
-  const batchDelete = useMutation({
+  const batchArchive = useMutation({
     mutationFn: async () => {
       for (const id of selectedIds) {
         await api.patch(`/api/v1/tasks/${id}/archive`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["lists", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setConfirmDelete(false);
+      onClear();
+    },
+  });
+
+  const batchPermanentDelete = useMutation({
+    mutationFn: async () => {
+      for (const id of selectedIds) {
+        await api.delete(`/api/v1/tasks/${id}`);
       }
     },
     onSuccess: () => {
@@ -120,25 +136,41 @@ export function BatchToolbar({ selectedIds, projectId, onClear }: BatchToolbarPr
         ))}
       </select>
 
-      {/* Delete */}
+      {/* Restore (archived view only) */}
+      {isArchived && !confirmDelete && (
+        <button
+          onClick={() => {
+            (async () => {
+              for (const id of selectedIds) await api.patch(`/api/v1/tasks/${id}/restore`);
+              queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+              onClear();
+            })();
+          }}
+          className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+        >
+          Restore
+        </button>
+      )}
+
+      {/* Delete / Archive */}
       {!confirmDelete ? (
         <button
           onClick={() => setConfirmDelete(true)}
           className="flex items-center gap-1 text-xs text-danger-500 hover:text-danger-700 transition-colors"
         >
           <Trash2 className="w-3 h-3" />
-          Delete
+          {isArchived ? "Delete forever" : "Archive"}
         </button>
       ) : (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-danger-500">Delete {selectedIds.length} task{selectedIds.length > 1 ? "s" : ""}?</span>
+          <span className="text-xs text-danger-500">{isArchived ? "Delete permanently" : "Archive"} {selectedIds.length} task{selectedIds.length > 1 ? "s" : ""}?</span>
           <button onClick={() => setConfirmDelete(false)} className="text-xs text-gray-500 hover:text-gray-700">No</button>
           <button
-            onClick={() => batchDelete.mutate()}
-            disabled={batchDelete.isPending}
+            onClick={() => isArchived ? batchPermanentDelete.mutate() : batchArchive.mutate()}
+            disabled={batchArchive.isPending || batchPermanentDelete.isPending}
             className="text-xs font-medium text-white bg-danger-600 px-2 py-0.5 rounded hover:bg-danger-700 disabled:opacity-50"
           >
-            {batchDelete.isPending ? "..." : "Yes"}
+            {(batchArchive.isPending || batchPermanentDelete.isPending) ? "..." : "Yes"}
           </button>
         </div>
       )}

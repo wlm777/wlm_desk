@@ -16,9 +16,9 @@ const PAGE_SIZE = 30;
 
 const VIEW_CONFIG: Record<string, { title: string; subtitle: string; emptyText: string; params: Record<string, string> }> = {
   my: { title: "My Tasks", subtitle: "Tasks assigned to you across all projects", emptyText: "You have no assigned tasks. Nice!", params: { assignee_id: "__me__" } },
-  "in-progress": { title: "In Progress", subtitle: "All tasks currently being worked on", emptyText: "No tasks are in progress right now", params: { status: "in_progress" } },
-  "due-today": { title: "Due Today", subtitle: "Tasks due today across all projects", emptyText: "Nothing due today!", params: { due_mode: "due_today" } },
-  overdue: { title: "Overdue", subtitle: "Tasks past their due date", emptyText: "No overdue tasks. Great job!", params: { due_mode: "overdue" } },
+  "in-progress": { title: "In Progress", subtitle: "Your tasks currently being worked on", emptyText: "No tasks are in progress right now", params: { status: "in_progress", assignee_id: "__me__" } },
+  "due-today": { title: "Due Today", subtitle: "Your tasks due today", emptyText: "Nothing due today!", params: { due_mode: "due_today", assignee_id: "__me__" } },
+  overdue: { title: "Overdue", subtitle: "Your tasks past their due date", emptyText: "No overdue tasks. Great job!", params: { due_mode: "overdue", assignee_id: "__me__" } },
   "high-priority": { title: "High Priority", subtitle: "All high-priority tasks", emptyText: "No high-priority tasks", params: { priority: "high" } },
   unassigned: { title: "Unassigned", subtitle: "Tasks with no assignee", emptyText: "All tasks have assignees", params: { assignee_id: "__none__" } },
   completed: { title: "Completed", subtitle: "All completed tasks", emptyText: "No completed tasks yet", params: { status: "completed" } },

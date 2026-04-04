@@ -7,6 +7,7 @@ export interface TaskFilters {
   due_mode: string;
   list_id: string;
   search: string;
+  archived: string;
 }
 
 /** Parse task filters from URL search params. Single source of truth. */
@@ -18,6 +19,7 @@ export function parseTaskFilters(searchParams: URLSearchParams): TaskFilters {
     due_mode: searchParams.get("due_mode") || "",
     list_id: searchParams.get("list") || "",
     search: searchParams.get("search") || "",
+    archived: searchParams.get("archived") || "",
   };
 }
 
@@ -31,15 +33,16 @@ export function buildTaskQueryParams(filters: TaskFilters, limit = 100): URLSear
   if (filters.assignee_id) params.set("assignee_id", filters.assignee_id);
   if (filters.due_mode) params.set("due_mode", filters.due_mode);
   if (filters.search) params.set("search", filters.search);
+  if (filters.archived) params.set("archived", filters.archived);
   return params;
 }
 
 /** Check if any filter is active. */
 export function hasActiveFilters(filters: TaskFilters): boolean {
-  return !!(filters.status || filters.priority || filters.assignee_id || filters.due_mode || filters.list_id || filters.search);
+  return !!(filters.status || filters.priority || filters.assignee_id || filters.due_mode || filters.list_id || filters.search || filters.archived);
 }
 
 /** Build a stable React Query key from filters. */
 export function taskQueryKey(projectId: string, filters: TaskFilters): unknown[] {
-  return ["tasks", projectId, filters.list_id, filters.status, filters.priority, filters.assignee_id, filters.due_mode, filters.search];
+  return ["tasks", projectId, filters.list_id, filters.status, filters.priority, filters.assignee_id, filters.due_mode, filters.search, filters.archived];
 }

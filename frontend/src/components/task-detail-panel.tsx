@@ -368,6 +368,24 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
     },
   });
 
+  const restoreTask = useMutation({
+    mutationFn: () => api.patch(`/api/v1/tasks/${taskId}/restore`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      onClose();
+    },
+  });
+
+  const permanentDeleteTask = useMutation({
+    mutationFn: () => api.delete(`/api/v1/tasks/${taskId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      onClose();
+    },
+  });
+
   const deleteAttachment = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/attachments/${id}`),
     onSuccess: () => {
@@ -484,20 +502,34 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={() => toggleWatch.mutate()}
-            className={`p-1 rounded transition-colors ${isWatching ? "text-primary-600 hover:text-primary-700" : "text-gray-400 hover:text-gray-600"}`}
-            title={isWatching ? "Stop watching" : "Watch this task"}
-          >
-            {isWatching ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={() => setConfirmDeleteTask(true)}
-            className="p-1 text-gray-400 hover:text-danger-500 rounded transition-colors"
-            title="Delete task"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {task.is_archived && (
+            <button
+              onClick={() => restoreTask.mutate()}
+              disabled={restoreTask.isPending}
+              className="px-2 py-1 text-xs font-medium text-primary-600 bg-primary-50 rounded hover:bg-primary-100 transition-colors disabled:opacity-50"
+            >
+              {restoreTask.isPending ? "..." : "Restore"}
+            </button>
+          )}
+          {!task.is_archived && (
+            <button
+              onClick={() => toggleWatch.mutate()}
+              className={`p-1 rounded transition-colors ${isWatching ? "text-primary-600 hover:text-primary-700" : "text-gray-400 hover:text-gray-600"}`}
+              title={isWatching ? "Stop watching" : "Watch this task"}
+            >
+              {isWatching ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+            </button>
+          )}
+          {/* Archive: user can only archive own tasks. Permanent delete: admin/manager only */}
+          {(currentUser?.role !== "user" || (!task.is_archived && task.created_by_id === currentUser?.id)) && (
+            <button
+              onClick={() => setConfirmDeleteTask(true)}
+              className="p-1 text-gray-400 hover:text-danger-500 rounded transition-colors"
+              title={task.is_archived ? "Delete permanently" : "Archive task"}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
             <X className="w-4 h-4" />
           </button>
@@ -1065,18 +1097,37 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
       {confirmDeleteTask && (
         <div className="absolute inset-0 bg-black/20 z-50 flex items-center justify-center" onClick={() => setConfirmDeleteTask(false)}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-4" onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-medium text-danger-600 mb-1">Delete Task</p>
-            <p className="text-sm text-gray-500 mb-4">Are you sure you want to delete &quot;{task.title}&quot;? This will archive the task and all its subtasks.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmDeleteTask(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
-              <button
-                onClick={() => deleteTask.mutate()}
-                disabled={deleteTask.isPending}
-                className="px-3 py-1.5 text-xs font-medium text-white bg-danger-600 rounded-md hover:bg-danger-700 disabled:opacity-50 transition-colors"
-              >
-                {deleteTask.isPending ? "Deleting..." : "Delete Task"}
-              </button>
-            </div>
+            {task.is_archived ? (
+              <>
+                <p className="text-sm font-medium text-danger-600 mb-1">Delete Permanently</p>
+                <p className="text-sm text-gray-500 mb-4">This will permanently delete &quot;{task.title}&quot; and all its subtasks, comments, and attachments. This cannot be undone.</p>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setConfirmDeleteTask(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
+                  <button
+                    onClick={() => permanentDeleteTask.mutate()}
+                    disabled={permanentDeleteTask.isPending}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-danger-600 rounded-md hover:bg-danger-700 disabled:opacity-50 transition-colors"
+                  >
+                    {permanentDeleteTask.isPending ? "Deleting..." : "Delete Forever"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-gray-900 mb-1">Archive Task</p>
+                <p className="text-sm text-gray-500 mb-4">Archive &quot;{task.title}&quot;? You can restore it later from the Archived view.</p>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => setConfirmDeleteTask(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
+                  <button
+                    onClick={() => deleteTask.mutate()}
+                    disabled={deleteTask.isPending}
+                    className="px-3 py-1.5 text-xs font-medium text-white bg-warning-700 rounded-md hover:bg-warning-800 disabled:opacity-50 transition-colors"
+                  >
+                    {deleteTask.isPending ? "Archiving..." : "Archive"}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

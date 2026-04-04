@@ -23,6 +23,8 @@ from app.api.v1.saved_filters import router as saved_filters_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.search import router as search_router
 from app.api.v1.system import router as system_router
+from app.api.v1.starred import router as starred_router
+from app.api.v1.clients import router as clients_router
 
 app = FastAPI(title="WLM Desk API")
 
@@ -54,3 +56,5 @@ app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboar
 app.include_router(audit_router, prefix="/api/v1/audit", tags=["audit"])
 app.include_router(search_router, prefix="/api/v1/search", tags=["search"])
 app.include_router(system_router, prefix="/api/v1/system", tags=["system"])
+app.include_router(starred_router, prefix="/api/v1", tags=["starred"])
+app.include_router(clients_router, prefix="/api/v1/clients", tags=["clients"])

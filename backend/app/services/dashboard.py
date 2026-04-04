@@ -12,51 +12,40 @@ from app.schemas.dashboard import DashboardSummary, StuckTask, WorkloadItem
 async def get_summary(db: AsyncSession, user: User) -> DashboardSummary:
     today = date.today()
 
-    # Base filter: non-archived tasks in non-archived projects
-    if user.role == UserRole.admin:
-        assigned_filter = True  # admin sees all
-    else:
-        assigned_filter = Task.id.in_(
-            select(TaskAssignee.task_id).where(TaskAssignee.user_id == user.id)
-        )
-
+    # Base filter: non-archived tasks in non-archived projects, assigned to THIS user
+    my_tasks = select(TaskAssignee.task_id).where(TaskAssignee.user_id == user.id)
     base = and_(
-        assigned_filter,
         Task.is_archived.is_(False),
-        Task.project_id.in_(
-            select(Project.id).where(Project.is_archived.is_(False))
-        ),
+        Task.project_id.in_(select(Project.id).where(Project.is_archived.is_(False))),
+        Task.id.in_(my_tasks),
     )
 
-    # my_tasks_count: all non-archived tasks in non-archived projects
+    # my_tasks_count: all my tasks
     my_tasks_count = (
         await db.execute(select(func.count()).select_from(Task).where(base))
     ).scalar() or 0
 
-    # in_progress_count
+    # in_progress_count: my tasks in progress
     in_progress_count = (
         await db.execute(
-            select(func.count())
-            .select_from(Task)
+            select(func.count()).select_from(Task)
             .where(base, Task.status == TaskStatus.in_progress)
         )
     ).scalar() or 0
 
-    # due_today_count: active, non-archived, NOT completed, due today
+    # due_today_count: my tasks, not completed, due today
     not_completed = and_(base, Task.status != TaskStatus.completed)
     due_today_count = (
         await db.execute(
-            select(func.count())
-            .select_from(Task)
+            select(func.count()).select_from(Task)
             .where(not_completed, Task.due_date == today)
         )
     ).scalar() or 0
 
-    # overdue_count: active, non-archived, NOT completed, due_date < today
+    # overdue_count: my tasks, not completed, overdue
     overdue_count = (
         await db.execute(
-            select(func.count())
-            .select_from(Task)
+            select(func.count()).select_from(Task)
             .where(not_completed, Task.due_date < today, Task.due_date.isnot(None))
         )
     ).scalar() or 0

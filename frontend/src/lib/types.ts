@@ -24,6 +24,7 @@ export interface User {
   notify_task_assigned: boolean;
   notify_subtask: boolean;
   notify_file_upload: boolean;
+  last_login_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -34,11 +35,24 @@ export interface Project {
   description: string | null;
   description_rich: Record<string, unknown> | null;
   owner_id: string;
+  client_id: string | null;
   is_archived: boolean;
   created_at: string;
   updated_at: string;
   task_count?: number;
   member_count?: number;
+}
+
+export interface Client {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ProjectMember {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Plus, FolderOpen, ListTodo, Users as UsersIcon, Trash2, X } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Header } from "@/components/header";
@@ -14,15 +14,25 @@ import type { Project, PaginatedResponse } from "@/lib/types";
 
 export default function ProjectsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth({ redirect: false });
   const [showCreate, setShowCreate] = useState(false);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
+  const clientFilter = searchParams.get("client") || "";
+
   const { data, isLoading } = useQuery<PaginatedResponse<Project>>({
     queryKey: ["projects"],
     queryFn: () => api.get("/api/v1/projects?limit=100"),
   });
+
+  const { data: clientsData } = useQuery<PaginatedResponse<{ id: string; name: string }>>({
+    queryKey: ["clients"],
+    queryFn: () => api.get("/api/v1/clients?limit=100"),
+    enabled: !!clientFilter,
+  });
+  const filterClientName = clientsData?.items?.find((c) => c.id === clientFilter)?.name;
 
   const deleteProject = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/projects/${id}`),
@@ -32,7 +42,8 @@ export default function ProjectsPage() {
     },
   });
 
-  const projects = data?.items ?? [];
+  const allProjects = data?.items ?? [];
+  const projects = clientFilter ? allProjects.filter((p) => p.client_id === clientFilter) : allProjects;
   const userRole = user?.role ?? "user";
   const canDelete = userRole === "admin" || userRole === "manager";
 
@@ -42,8 +53,17 @@ export default function ProjectsPage() {
       <div className="flex-1 p-3 sm:p-6 overflow-auto">
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">Projects</h1>
-            <p className="text-sm text-gray-500 mt-0.5">{projects.length} project{projects.length !== 1 ? "s" : ""}</p>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">
+                {filterClientName ? `${filterClientName} — Projects` : "Projects"}
+              </h1>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {projects.length} project{projects.length !== 1 ? "s" : ""}
+                {clientFilter && (
+                  <button onClick={() => router.push("/projects")} className="ml-2 text-primary-600 hover:text-primary-700">Show all</button>
+                )}
+              </p>
+            </div>
           </div>
           {user && canCreateProject(userRole) && (
             <button

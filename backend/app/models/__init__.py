@@ -12,6 +12,8 @@ from app.models.audit_log import AuditLog
 from app.models.notification import Notification
 from app.models.saved_filter import SavedFilter
 from app.models.system_settings import SystemSettings
+from app.models.starred_project import StarredProject
+from app.models.client import Client
 from app.models.enums import UserRole, TaskStatus, TaskPriority, SubtaskStatus
 
 __all__ = [

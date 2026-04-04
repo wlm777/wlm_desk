@@ -71,7 +71,7 @@ async def get_tasks(
     search: str | None = None,
     limit: int = 50,
     offset: int = 0,
-    include_archived: bool = False,
+    include_archived: bool | str = False,  # False, True, or "only"
     newest_first: bool = False,
 ) -> tuple[list[Task], int]:
     """Query tasks with combinable filters.
@@ -85,7 +85,10 @@ async def get_tasks(
     q = select(Task).where(Task.project_id == project_id)
     count_q = select(func.count()).select_from(Task).where(Task.project_id == project_id)
 
-    if not include_archived:
+    if include_archived == "only":
+        q = q.where(Task.is_archived.is_(True))
+        count_q = count_q.where(Task.is_archived.is_(True))
+    elif not include_archived:
         q = q.where(Task.is_archived.is_(False))
         count_q = count_q.where(Task.is_archived.is_(False))
 

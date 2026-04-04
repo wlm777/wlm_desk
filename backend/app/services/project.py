@@ -14,6 +14,7 @@ async def create_project(db: AsyncSession, data: ProjectCreate, owner: User) -> 
         description=data.description,
         description_rich=data.description_rich,
         owner_id=owner.id,
+        client_id=getattr(data, "client_id", None),
     )
     db.add(project)
     await db.flush()
@@ -26,6 +27,16 @@ async def create_project(db: AsyncSession, data: ProjectCreate, owner: User) -> 
             if uid not in added_ids:
                 db.add(ProjectMember(project_id=project.id, user_id=uid))
                 added_ids.add(uid)
+    # Create default task list
+    from app.models.task_list import TaskList
+    from app.core.colors import color_from_id
+    default_list = TaskList(
+        project_id=project.id,
+        name="Task List",
+        position=0,
+        color=color_from_id(str(project.id)),
+    )
+    db.add(default_list)
     await db.flush()
     return project
 
@@ -72,10 +83,12 @@ async def update_project(db: AsyncSession, project: Project, data: ProjectUpdate
     for field, value in data.model_dump(exclude_unset=True).items():
         setattr(project, field, value)
     await db.flush()
+    await db.refresh(project)
     return project
 
 
 async def archive_project(db: AsyncSession, project: Project) -> Project:
     project.is_archived = True
     await db.flush()
+    await db.refresh(project)
     return project

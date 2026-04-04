@@ -37,6 +37,7 @@ class UserRead(BaseModel):
     notify_task_assigned: bool = True
     notify_subtask: bool = True
     notify_file_upload: bool = True
+    last_login_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone as tz
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
@@ -8,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models import Project, ProjectMember, Task, TaskAssignee, User, UserRole
+
+_ACTIVITY_THROTTLE_SECONDS = 300  # update last_login_at at most every 5 min
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
@@ -25,6 +28,11 @@ async def get_current_user(
     user = await db.get(User, uuid.UUID(user_id))
     if user is None or not user.is_active:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "User not found or inactive")
+    # Throttled last-activity update
+    now = datetime.now(tz.utc)
+    if user.last_login_at is None or (now - user.last_login_at).total_seconds() > _ACTIVITY_THROTTLE_SECONDS:
+        user.last_login_at = now
+        await db.commit()
     return user
 
 

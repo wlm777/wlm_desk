@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { useState, useCallback, useEffect, useRef } from "react";
-import { MessageSquare, ListChecks, Bookmark, GripVertical, Pencil, X, Check, Trash2, Search, ChevronRight, Plus } from "lucide-react";
+import { MessageSquare, ListChecks, Bookmark, GripVertical, Pencil, X, Check, Trash2, Search, ChevronRight, Plus, Star } from "lucide-react";
 import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
@@ -82,6 +82,7 @@ export default function ProjectPage() {
   const [showEditProject, setShowEditProject] = useState(false);
   const [editProjectName, setEditProjectName] = useState("");
   const [editProjectDesc, setEditProjectDesc] = useState("");
+  const [editProjectClient, setEditProjectClient] = useState("");
   const [editProjectMembers, setEditProjectMembers] = useState<Set<string>>(new Set());
   const [editingListId, setEditingListId] = useState<string | null>(null);
   const [deletingList, setDeletingList] = useState<{ id: string; name: string; taskCount: number } | null>(null);
@@ -321,6 +322,7 @@ export default function ProjectPage() {
       // 1. Update name/description
       await api.put(`/api/v1/projects/${projectId}`, {
         name: editProjectName.trim(),
+        client_id: editProjectClient || null,
         description: editProjectDesc.trim() || undefined,
       });
 
@@ -385,6 +387,16 @@ export default function ProjectPage() {
     queryFn: () => api.get(`/api/v1/projects/${projectId}/members`),
   });
 
+  const { data: starredData } = useQuery<{ id: string; project_id: string }[]>({
+    queryKey: ["starred-projects"],
+    queryFn: () => api.get("/api/v1/starred-projects"),
+  });
+  const isStarred = starredData?.some((s) => s.project_id === projectId) ?? false;
+  const toggleStar = useMutation({
+    mutationFn: () => isStarred ? api.delete(`/api/v1/starred-projects/${projectId}`) : api.post(`/api/v1/starred-projects/${projectId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["starred-projects"] }),
+  });
+
   // All users for member picker in edit modal
   const { data: allUsersData } = useQuery<PaginatedResponse<User>>({
     queryKey: ["users-for-edit"],
@@ -392,6 +404,13 @@ export default function ProjectPage() {
     enabled: showEditProject,
   });
   const allUsers = allUsersData?.items?.filter((u) => u.is_active) ?? [];
+
+  const { data: editClientsData } = useQuery<PaginatedResponse<{ id: string; name: string; company: string | null }>>({
+    queryKey: ["clients"],
+    queryFn: () => api.get("/api/v1/clients?limit=100"),
+    enabled: showEditProject,
+  });
+  const editClients = editClientsData?.items ?? [];
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
@@ -665,6 +684,13 @@ export default function ProjectPage() {
           {project && (
             <div className="mb-6">
               <div className="flex items-center gap-2">
+                <button
+                  onClick={() => toggleStar.mutate()}
+                  className="p-1 transition-colors shrink-0"
+                  title={isStarred ? "Remove from featured" : "Add to featured"}
+                >
+                  <Star className={cn("w-5 h-5", isStarred ? "text-warning-500 fill-warning-500" : "text-gray-300 hover:text-warning-400")} />
+                </button>
                 <h1
                   className="text-xl font-semibold text-primary-600 hover:text-primary-700 cursor-pointer transition-colors"
                   onClick={() => router.push(`/projects/${projectId}`)}
@@ -676,6 +702,7 @@ export default function ProjectPage() {
                     onClick={() => {
                       setEditProjectName(project.name);
                       setEditProjectDesc(project.description || "");
+                      setEditProjectClient(project.client_id || "");
                       setEditProjectMembers(new Set(members?.map((m) => m.user_id) ?? []));
                       setShowEditProject(true);
                     }}
@@ -699,6 +726,7 @@ export default function ProjectPage() {
                 selectedIds={Array.from(checkedIds)}
                 projectId={projectId}
                 onClear={() => setCheckedIds(new Set())}
+                isArchived={!!activeFilters.archived}
               />
             </div>
           )}
@@ -1210,6 +1238,18 @@ export default function ProjectPage() {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
                 />
               </div>
+
+              {/* Client */}
+              {editClients.length > 0 && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Client</label>
+                  <select value={editProjectClient} onChange={(e) => setEditProjectClient(e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                    <option value="">No client</option>
+                    {editClients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.company ? ` (${c.company})` : ""}</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Members */}
               <div>

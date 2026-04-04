@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { RichEditor } from "@/components/rich-editor";
-import type { Project, User, PaginatedResponse } from "@/lib/types";
+import type { Project, User, Client, PaginatedResponse } from "@/lib/types";
 
 interface CreateProjectModalProps {
   onClose: () => void;
@@ -20,6 +20,7 @@ export function CreateProjectModal({ onClose }: CreateProjectModalProps) {
   const [description, setDescription] = useState("");
   const [descriptionRich, setDescriptionRich] = useState<Record<string, unknown> | null>(null);
   const [selectedMembers, setSelectedMembers] = useState<Set<string>>(new Set());
+  const [clientId, setClientId] = useState("");
   const [error, setError] = useState("");
 
   // Fetch users for member selection (admin can see all, others see limited)
@@ -29,6 +30,12 @@ export function CreateProjectModal({ onClose }: CreateProjectModalProps) {
   });
 
   const users = usersData?.items?.filter((u) => u.is_active) ?? [];
+
+  const { data: clientsData } = useQuery<PaginatedResponse<Client>>({
+    queryKey: ["clients"],
+    queryFn: () => api.get("/api/v1/clients?limit=100"),
+  });
+  const clients = clientsData?.items ?? [];
 
   const createProject = useMutation({
     mutationFn: (body: Record<string, unknown>) =>
@@ -57,6 +64,7 @@ export function CreateProjectModal({ onClose }: CreateProjectModalProps) {
       name: name.trim(),
       description: description.trim() || undefined,
       description_rich: descriptionRich || undefined,
+      client_id: clientId || undefined,
       member_ids: selectedMembers.size > 0 ? Array.from(selectedMembers) : undefined,
     });
   }
@@ -92,6 +100,17 @@ export function CreateProjectModal({ onClose }: CreateProjectModalProps) {
               placeholder="Project description..."
             />
           </div>
+
+          {clients.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Client</label>
+              <select value={clientId} onChange={(e) => setClientId(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                <option value="">No client</option>
+                {clients.map((c) => <option key={c.id} value={c.id}>{c.name}{c.company ? ` (${c.company})` : ""}</option>)}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-medium text-gray-700 mb-1">Members</label>

@@ -105,6 +105,7 @@ async def list_tasks(
     assignee_id: str | None = Query(None),
     due_mode: str | None = Query(None),
     search: str | None = None,
+    archived: bool = Query(False),
     newest_first: bool = Query(False),
     limit: int = Query(50, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -130,6 +131,7 @@ async def list_tasks(
         assignee_id=resolved_assignee, unassigned=unassigned,
         due_mode=due_mode, search=search,
         limit=limit, offset=offset,
+        include_archived="only" if archived else False,
         newest_first=newest_first,
         viewer_id=user.id, viewer_role=user.role.value,
     )
@@ -241,10 +243,61 @@ async def archive_task(
     if not task:
         raise HTTPException(status.HTTP_404_NOT_FOUND)
     await _check_task_edit(task, user, db)
+    # User role: can only archive tasks they created
+    if user.role == UserRole.user and task.created_by_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "You can only archive tasks you created")
     task = await task_service.archive_task(db, task)
     await audit_service.log_action(db, "task", task.id, "archived", user.id, None)
     await db.commit()
     return await task_service.get_task_with_counts(db, task)
+
+
+@router.patch("/tasks/{task_id}/restore", response_model=TaskRead)
+async def restore_task(
+    task_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    await _check_task_edit(task, user, db)
+    task.is_archived = False
+    await db.flush()
+    await db.refresh(task)
+    await audit_service.log_action(db, "task", task.id, "restored", user.id, None)
+    await db.commit()
+    return await task_service.get_task_with_counts(db, task)
+
+
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def permanently_delete_task(
+    task_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Permanently delete a task and all related data + files. Admin/Manager only."""
+    task = await task_service.get_task(db, task_id)
+    if not task:
+        raise HTTPException(status.HTTP_404_NOT_FOUND)
+    if user.role == UserRole.user:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only admin or manager can permanently delete tasks")
+    await _check_task_edit(task, user, db)
+
+    project_id = task.project_id
+    task_title = task.title
+
+    # Delete attachment files from disk
+    from app.services.attachment import get_attachments, delete_task_files
+    delete_task_files(project_id, task_id)
+
+    # Delete task (cascades to subtasks, comments, attachments, assignees, watchers)
+    await db.delete(task)
+    await audit_service.log_action(
+        db, "task", task_id, "deleted", user.id,
+        {"title": task_title, "project_id": str(project_id)},
+    )
+    await db.commit()
 
 
 @router.patch("/tasks/reorder", response_model=TaskReorderResponse)

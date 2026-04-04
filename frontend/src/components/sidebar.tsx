@@ -19,6 +19,10 @@ import {
   CheckCircle,
   Bookmark,
   Trash2,
+  Archive,
+  Star,
+  ChevronRight,
+  UsersRound,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { logout } from "@/lib/auth";
@@ -35,6 +39,7 @@ const BUILT_IN_VIEWS = [
   { id: "high-priority", label: "High Priority", icon: ArrowUp, params: { priority: "high" } },
   { id: "unassigned", label: "Unassigned", icon: UserX, params: { assignee_id: "__none__" } },
   { id: "completed", label: "Completed", icon: CheckCircle, params: { status: "completed" } },
+  { id: "archived", label: "Archived", icon: Archive, params: { archived: "true" } },
 ] as const;
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
@@ -49,6 +54,26 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const [projectSearch, setProjectSearch] = useState("");
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [showAddList, setShowAddList] = useState(false);
+
+  // Collapsible sidebar sections (persisted in localStorage)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => {
+    if (typeof window === "undefined") return new Set();
+    const stored = new Set<string>();
+    try {
+      const val = localStorage.getItem("wlm:sidebar:collapsed");
+      if (val) JSON.parse(val).forEach((s: string) => stored.add(s));
+    } catch {}
+    return stored;
+  });
+
+  function toggleSection(section: string) {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section); else next.add(section);
+      try { localStorage.setItem("wlm:sidebar:collapsed", JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  }
   const [newListName, setNewListName] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -58,6 +83,21 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { data: projectsData } = useQuery<PaginatedResponse<Project>>({
     queryKey: ["projects"],
     queryFn: () => api.get("/api/v1/projects?limit=100"),
+  });
+
+  const { data: starredData } = useQuery<{ id: string; project_id: string }[]>({
+    queryKey: ["starred-projects"],
+    queryFn: () => api.get("/api/v1/starred-projects"),
+  });
+
+  const starredIds = new Set(starredData?.map((s) => s.project_id) ?? []);
+
+  const toggleStar = useMutation({
+    mutationFn: (projectId: string) =>
+      starredIds.has(projectId)
+        ? api.delete(`/api/v1/starred-projects/${projectId}`)
+        : api.post(`/api/v1/starred-projects/${projectId}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["starred-projects"] }),
   });
 
   const { data: lists } = useQuery<TaskList[]>({
@@ -147,6 +187,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const navItems = [
     { href: "/", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/projects", icon: FolderOpen, label: "All Projects" },
+    { href: "/clients", icon: UsersRound, label: "Clients" },
   ];
 
   return (
@@ -182,12 +223,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
               {filteredProjects.map((p) => (
                 <button
                   key={p.id}
-                  onClick={() => {
-                    router.push(`/projects/${p.id}`);
-                    setProjectOpen(false);
-                    setProjectSearch("");
-                    onNavigate?.();
-                  }}
+                  onClick={() => { router.push(`/projects/${p.id}`); setProjectOpen(false); setProjectSearch(""); onNavigate?.(); }}
                   className={cn(
                     "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
                     p.id === currentProjectId && "bg-primary-50 text-primary-700"
@@ -217,10 +253,12 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
       {/* Lists for current project */}
       {currentProjectId && (
         <div className="px-3 py-2 border-b border-gray-200">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">
-            Lists
-          </p>
-          {/* Scrollable list area — max 7 items visible (7 × 32px = 224px) */}
+          <button onClick={() => toggleSection("lists")} className="flex items-center gap-1 w-full px-2 mb-1">
+            <ChevronRight className={cn("w-3 h-3 text-gray-400 transition-transform", !collapsedSections.has("lists") && "rotate-90")} />
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Lists</span>
+          </button>
+          {!collapsedSections.has("lists") && (
+          <>
           <div className={lists && lists.length > 7 ? "max-h-[224px] overflow-y-auto" : ""}>
             {lists?.map((list) => (
               <button
@@ -237,7 +275,6 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
             ))}
           </div>
 
-          {/* Add List — outside scroll, always visible */}
           {user && canManageLists(userRole) && (
             showAddList ? (
               <form
@@ -265,17 +302,43 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
               </button>
             )
           )}
+          </>
+          )}
         </div>
       )}
+
+      {/* Featured Projects */}
+      {(() => {
+        const starredProjects = projects.filter((p) => starredIds.has(p.id));
+        if (starredProjects.length === 0) return null;
+        return (
+          <div className="px-3 py-2 border-b border-gray-200">
+            <button onClick={() => toggleSection("featured")} className="flex items-center gap-1 w-full px-2 mb-1">
+              <ChevronRight className={cn("w-3 h-3 text-gray-400 transition-transform", !collapsedSections.has("featured") && "rotate-90")} />
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Featured Projects</span>
+            </button>
+            {!collapsedSections.has("featured") && starredProjects.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => { router.push(`/projects/${p.id}`); onNavigate?.(); }}
+                className={cn("w-full flex items-center gap-2 px-2 py-1.5 text-sm rounded-md hover:bg-gray-50 transition-colors", p.id === currentProjectId && "bg-primary-50 text-primary-700")}
+              >
+                <Star className="w-3.5 h-3.5 text-warning-500 fill-warning-500 shrink-0" />
+                <span className="truncate">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Saved Views */}
       {currentProjectId && (
         <div className="px-3 py-2 border-b border-gray-200">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider px-2 mb-1">
-            Views
-          </p>
-          {/* Built-in views */}
-          {BUILT_IN_VIEWS.map((view) => (
+          <button onClick={() => toggleSection("views")} className="flex items-center gap-1 w-full px-2 mb-1">
+            <ChevronRight className={cn("w-3 h-3 text-gray-400 transition-transform", !collapsedSections.has("views") && "rotate-90")} />
+            <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">Views</span>
+          </button>
+          {!collapsedSections.has("views") && BUILT_IN_VIEWS.map((view) => (
             <button
               key={view.id}
               onClick={() => applyView(view.params)}
@@ -292,7 +355,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
           ))}
 
           {/* Custom saved filters */}
-          {savedFilters && savedFilters.length > 0 && (
+          {!collapsedSections.has("views") && savedFilters && savedFilters.length > 0 && (
             <>
               <div className="h-px bg-gray-100 my-1" />
               {savedFilters.map((sf) => (

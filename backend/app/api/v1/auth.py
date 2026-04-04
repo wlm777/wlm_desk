@@ -45,6 +45,11 @@ async def login(data: LoginRequest, request: Request, db: AsyncSession = Depends
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid email or password")
     if not user.is_active:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Account is deactivated")
+    # Update last login
+    from datetime import datetime, timezone as tz
+    user.last_login_at = datetime.now(tz.utc)
+    await db.commit()
+
     token = create_access_token({"sub": str(user.id), "role": user.role.value})
     return TokenResponse(access_token=token)
 
