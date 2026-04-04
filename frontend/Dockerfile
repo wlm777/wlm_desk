@@ -1,15 +1,11 @@
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 WORKDIR /app
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 RUN npm ci
-RUN echo "=== .bin ===" && ls -la node_modules/.bin/next || true
-RUN echo "=== next pkg ===" && ls -la node_modules/next || true
-RUN echo "=== next bin ===" && ls -la node_modules/next/dist/bin || true
-RUN npm ls next
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runner
+FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/.next/standalone ./
