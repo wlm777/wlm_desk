@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { X } from "lucide-react";
+import { X, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { api } from "@/lib/api";
 import { STATUS_CONFIG, PRIORITY_CONFIG } from "@/lib/constants";
@@ -22,6 +22,7 @@ interface BatchResult {
 export function BatchToolbar({ selectedIds, projectId, onClear }: BatchToolbarProps) {
   const queryClient = useQueryClient();
   const [showResult, setShowResult] = useState<BatchResult | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const { data: lists } = useQuery<TaskList[]>({
     queryKey: ["lists", projectId],
@@ -44,6 +45,21 @@ export function BatchToolbar({ selectedIds, projectId, onClear }: BatchToolbarPr
           setShowResult(null);
         }, 1500);
       }
+    },
+  });
+
+  const batchDelete = useMutation({
+    mutationFn: async () => {
+      for (const id of selectedIds) {
+        await api.patch(`/api/v1/tasks/${id}/archive`);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["lists", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setConfirmDelete(false);
+      onClear();
     },
   });
 
@@ -103,6 +119,29 @@ export function BatchToolbar({ selectedIds, projectId, onClear }: BatchToolbarPr
           <option key={l.id} value={l.id}>{l.name}</option>
         ))}
       </select>
+
+      {/* Delete */}
+      {!confirmDelete ? (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="flex items-center gap-1 text-xs text-danger-500 hover:text-danger-700 transition-colors"
+        >
+          <Trash2 className="w-3 h-3" />
+          Delete
+        </button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-danger-500">Delete {selectedIds.length} task{selectedIds.length > 1 ? "s" : ""}?</span>
+          <button onClick={() => setConfirmDelete(false)} className="text-xs text-gray-500 hover:text-gray-700">No</button>
+          <button
+            onClick={() => batchDelete.mutate()}
+            disabled={batchDelete.isPending}
+            className="text-xs font-medium text-white bg-danger-600 px-2 py-0.5 rounded hover:bg-danger-700 disabled:opacity-50"
+          >
+            {batchDelete.isPending ? "..." : "Yes"}
+          </button>
+        </div>
+      )}
 
       {/* Result feedback */}
       {showResult && (

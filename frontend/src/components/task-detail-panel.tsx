@@ -52,6 +52,9 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [descriptionRichDraft, setDescriptionRichDraft] = useState<Record<string, unknown> | null>(null);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState("");
+  const [confirmDeleteTask, setConfirmDeleteTask] = useState(false);
   const [showAssignPicker, setShowAssignPicker] = useState(false);
   const [assignSearch, setAssignSearch] = useState("");
   const [subtaskStatusMenu, setSubtaskStatusMenu] = useState<string | null>(null);
@@ -356,6 +359,15 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
     },
   });
 
+  const deleteTask = useMutation({
+    mutationFn: () => api.patch(`/api/v1/tasks/${taskId}/archive`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks", projectId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      onClose();
+    },
+  });
+
   const deleteAttachment = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/attachments/${id}`),
     onSuccess: () => {
@@ -439,9 +451,38 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
     >
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <h2 className="text-sm font-semibold text-gray-900 truncate pr-2">
-          {task.title}
-        </h2>
+        <div className="flex-1 min-w-0 pr-2">
+          {editingTitle ? (
+            <input
+              type="text"
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={() => {
+                if (titleDraft.trim() && titleDraft.trim() !== task.title) {
+                  updateTask.mutate({ title: titleDraft.trim() } as any);
+                }
+                setEditingTitle(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { (e.target as HTMLInputElement).blur(); }
+                if (e.key === "Escape") { setEditingTitle(false); }
+              }}
+              autoFocus
+              className="w-full text-sm font-semibold text-gray-900 bg-white border border-primary-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            />
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-sm font-semibold text-gray-900 truncate">{task.title}</h2>
+              <button
+                onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}
+                className="p-0.5 text-gray-300 hover:text-primary-600 transition-colors shrink-0"
+                title="Edit title"
+              >
+                <Pencil className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
         <div className="flex items-center gap-1 shrink-0">
           <button
             onClick={() => toggleWatch.mutate()}
@@ -449,6 +490,13 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
             title={isWatching ? "Stop watching" : "Watch this task"}
           >
             {isWatching ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </button>
+          <button
+            onClick={() => setConfirmDeleteTask(true)}
+            className="p-1 text-gray-400 hover:text-danger-500 rounded transition-colors"
+            title="Delete task"
+          >
+            <Trash2 className="w-4 h-4" />
           </button>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
             <X className="w-4 h-4" />
@@ -1012,6 +1060,26 @@ export function TaskDetailPanel({ taskId, projectId, onClose, activeTabIndex, on
           <> &middot; Updated {new Date(task.updated_at).toLocaleDateString()}</>
         )}
       </div>
+
+      {/* Delete task confirmation */}
+      {confirmDeleteTask && (
+        <div className="absolute inset-0 bg-black/20 z-50 flex items-center justify-center" onClick={() => setConfirmDeleteTask(false)}>
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm mx-4 p-4" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-medium text-danger-600 mb-1">Delete Task</p>
+            <p className="text-sm text-gray-500 mb-4">Are you sure you want to delete &quot;{task.title}&quot;? This will archive the task and all its subtasks.</p>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setConfirmDeleteTask(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-md transition-colors">Cancel</button>
+              <button
+                onClick={() => deleteTask.mutate()}
+                disabled={deleteTask.isPending}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-danger-600 rounded-md hover:bg-danger-700 disabled:opacity-50 transition-colors"
+              >
+                {deleteTask.isPending ? "Deleting..." : "Delete Task"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Discard changes confirmation */}
       {discardConfirm && (
