@@ -48,6 +48,7 @@ async def create_user(
         {"email": data.email, "role": data.role.value},
     )
     await db.commit()
+    await db.refresh(user)
     return user
 
 
