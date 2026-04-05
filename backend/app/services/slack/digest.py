@@ -3,17 +3,28 @@
 import logging
 from datetime import date, datetime, timezone
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Project, Task, TaskAssignee, User
 from app.models.enums import TaskStatus, TaskPriority
+from app.models.pending_notification import PendingNotification
 from app.services.slack_notify import _post_webhook, _is_working_day
 
 _DIGEST_PRIORITY_TAG = {
     "high": " :sos:",
     "medium": " :rocket:",
     "low": " :pea_pod:",
+}
+
+_EVENT_LABEL = {
+    "comment": ":speech_balloon: comment on",
+    "task_created": ":mega: new task",
+    "task_updated": ":pencil2: updated",
+    "task_assigned": ":bust_in_silhouette: assigned to you",
+    "subtask": ":arrow_right: subtask on",
+    "file_upload": ":paperclip: file on",
+    "watcher": ":eyes: activity on",
 }
 
 logger = logging.getLogger(__name__)
@@ -53,13 +64,43 @@ async def _query_in_progress_tasks(db: AsyncSession, user: User) -> list[tuple]:
     return result.all()
 
 
+async def _query_pending_notifications(db: AsyncSession, user: User) -> list[PendingNotification]:
+    """Get all pending (queued) notifications for a user."""
+    result = await db.execute(
+        select(PendingNotification)
+        .where(PendingNotification.user_id == user.id)
+        .order_by(PendingNotification.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+async def _clear_pending_notifications(db: AsyncSession, user: User) -> None:
+    """Delete all pending notifications for a user after they've been sent."""
+    await db.execute(
+        delete(PendingNotification).where(PendingNotification.user_id == user.id)
+    )
+
+
 def _build_digest_payload(
     user_name: str,
     new_tasks: list[tuple] | None,
     in_progress: list[tuple] | None,
+    pending: list[PendingNotification] | None = None,
 ) -> dict | None:
     """Build Slack message payload for daily digest. Returns None if empty."""
     sections: list[str] = []
+
+    # Missed notifications from non-working days
+    if pending:
+        lines = ["*Missed while you were away*"]
+        for pn in pending:
+            label = _EVENT_LABEL.get(pn.event_type, pn.event_type)
+            ptag = _DIGEST_PRIORITY_TAG.get(pn.task_priority or "", "")
+            line = f"  • {label} *{pn.task_title}* — _{pn.project_name}_{ptag}"
+            if pn.detail:
+                line += f"\n      {pn.detail}"
+            lines.append(line)
+        sections.append("\n".join(lines))
 
     if new_tasks:
         lines = ["*New Tasks*"]
@@ -80,8 +121,15 @@ def _build_digest_payload(
 
     header = f"📋 *Daily Digest* — Good morning, {user_name}!\n"
     body = "\n\n".join(sections)
-    total = (len(new_tasks) if new_tasks else 0) + (len(in_progress) if in_progress else 0)
-    footer = f"\n\n_{total} task(s) total_"
+
+    task_total = (len(new_tasks) if new_tasks else 0) + (len(in_progress) if in_progress else 0)
+    pending_total = len(pending) if pending else 0
+    parts = []
+    if task_total:
+        parts.append(f"{task_total} task(s)")
+    if pending_total:
+        parts.append(f"{pending_total} missed notification(s)")
+    footer = f"\n\n_{', '.join(parts)}_" if parts else ""
 
     return {"text": header + body + footer}
 
@@ -89,9 +137,8 @@ def _build_digest_payload(
 async def send_daily_digest(db: AsyncSession, user: User) -> bool:
     """Send daily digest to a user via their Slack webhook.
 
-    Respects per-user preferences:
-    - notify_daily_new_tasks
-    - notify_daily_in_progress
+    On working days, includes any queued notifications from non-working days.
+    On non-working days, digest is skipped (notifications keep accumulating).
 
     Returns True if message was sent, False otherwise.
     """
@@ -103,13 +150,17 @@ async def send_daily_digest(db: AsyncSession, user: User) -> bool:
         return False
 
     has_any = user.notify_daily_new_tasks or user.notify_daily_in_progress
-    if not has_any:
-        return False
 
     new_tasks = await _query_new_tasks(db, user) if user.notify_daily_new_tasks else None
     in_progress = await _query_in_progress_tasks(db, user) if user.notify_daily_in_progress else None
 
-    payload = _build_digest_payload(user.full_name, new_tasks, in_progress)
+    # Always check for pending notifications (even if daily prefs are off)
+    pending = await _query_pending_notifications(db, user)
+
+    if not has_any and not pending:
+        return False
+
+    payload = _build_digest_payload(user.full_name, new_tasks, in_progress, pending or None)
     if not payload:
         logger.info("No digest content for %s, skipping", user.email)
         return False
@@ -117,8 +168,10 @@ async def send_daily_digest(db: AsyncSession, user: User) -> bool:
     success = await _post_webhook(user.slack_webhook_url, payload)
     if success:
         user.last_digest_at = datetime.now(timezone.utc)
+        if pending:
+            await _clear_pending_notifications(db, user)
         await db.flush()
-        logger.info("Digest sent to %s", user.email)
+        logger.info("Digest sent to %s (%d pending cleared)", user.email, len(pending))
     else:
         logger.warning("Digest webhook failed for %s", user.email)
 

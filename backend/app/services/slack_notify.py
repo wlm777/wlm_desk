@@ -196,7 +196,8 @@ async def send_to_user(
 ) -> None:
     """Send a Slack notification to a single user if their preferences allow it.
 
-    On non-working days, only comment/subtask events for high-priority tasks are sent.
+    Does NOT check working days — that is handled by notify_users() which queues
+    suppressed notifications for the next daily digest.
     """
     try:
         if not user.slack_enabled or not user.slack_webhook_url:
@@ -206,15 +207,17 @@ async def send_to_user(
         if pref_field and not getattr(user, pref_field, True):
             return
 
-        # Working day filter: suppress on non-working days unless task is high priority
-        if not _is_working_day(user):
-            if task_priority != "high":
-                return
-
         payload = _build_message(event_type, task_title, project_name, actor_name, project_id, task_id, detail, changes, task_priority)
         await _post_webhook(user.slack_webhook_url, payload)
     except Exception:
         logger.exception("send_to_user failed for user %s event %s", user.id, event_type)
+
+
+def _format_detail_for_queue(event_type: str, detail: str | None, changes: dict | None) -> str | None:
+    """Build a single detail string for the pending notification queue."""
+    if changes and event_type == "task_updated":
+        return _format_change_detail(changes) or detail
+    return detail
 
 
 async def notify_users(
@@ -231,11 +234,17 @@ async def notify_users(
     changes: dict | None = None,
     task_priority: str | None = None,
 ) -> None:
-    """Send Slack notifications to multiple users (excluding the actor)."""
+    """Send Slack notifications to multiple users (excluding the actor).
+
+    On non-working days, high-priority task notifications are sent immediately.
+    All other notifications are queued and delivered with the next daily digest.
+    """
     if not user_ids:
         return
 
     try:
+        from app.models.pending_notification import PendingNotification
+
         result = await db.execute(
             select(User).where(
                 User.id.in_(user_ids),
@@ -248,6 +257,25 @@ async def notify_users(
         for user in users:
             if actor_id and user.id == actor_id:
                 continue
+
+            # Check user preference
+            pref_field = EVENT_PREF_MAP.get(event_type)
+            if pref_field and not getattr(user, pref_field, True):
+                continue
+
+            # Working day check: high priority → send now; others → queue for digest
+            if not _is_working_day(user) and task_priority != "high":
+                db.add(PendingNotification(
+                    user_id=user.id,
+                    event_type=event_type,
+                    task_title=task_title,
+                    project_name=project_name,
+                    actor_name=actor_name,
+                    detail=_format_detail_for_queue(event_type, detail, changes),
+                    task_priority=task_priority,
+                ))
+                continue
+
             await send_to_user(user, event_type, task_title, project_name, actor_name, project_id, task_id, detail, changes, task_priority)
     except Exception:
         logger.exception("notify_users failed for event %s", event_type)
