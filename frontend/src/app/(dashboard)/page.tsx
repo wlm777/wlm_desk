@@ -2,13 +2,13 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import { Clock, AlertTriangle, FolderKanban, User as UserIcon, UsersRound } from "lucide-react";
+import { Clock, AlertTriangle, FolderKanban, User as UserIcon, UsersRound, Flame } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Header } from "@/components/header";
 import { api } from "@/lib/api";
 import { PRIORITY_CONFIG } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-import type { DashboardSummary, WorkloadItem, StuckTask, TaskPriority } from "@/lib/types";
+import type { DashboardSummary, WorkloadItem, StuckTask, HighPriorityTask, TaskPriority } from "@/lib/types";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -26,6 +26,11 @@ export default function DashboardPage() {
   const { data: stuck, isLoading: stuckLoading } = useQuery<StuckTask[]>({
     queryKey: ["dashboard-stuck"],
     queryFn: () => api.get("/api/v1/dashboard/stuck"),
+  });
+
+  const { data: highPriority, isLoading: highPriorityLoading } = useQuery<HighPriorityTask[]>({
+    queryKey: ["dashboard-high-priority"],
+    queryFn: () => api.get("/api/v1/dashboard/high-priority"),
   });
 
   const { data: clientsWithCounts } = useQuery<{ id: string; name: string; company: string | null; project_count: number }[]>({
@@ -202,6 +207,60 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
+        {/* High Priority Tasks */}
+        {(highPriorityLoading || (highPriority && highPriority.length > 0)) && (
+          <div className="bg-white border border-gray-200 rounded-xl p-5 mt-6">
+            <h2 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <Flame className="w-4 h-4 text-danger-500" />
+              High Priority Tasks
+            </h2>
+            {highPriorityLoading ? (
+              <div className="space-y-2 animate-pulse">
+                {[1, 2].map((i) => (
+                  <div key={i} className="p-3 border border-gray-100 rounded-lg">
+                    <div className="h-4 bg-gray-100 rounded w-3/4 mb-2" />
+                    <div className="h-3 bg-gray-100 rounded w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : highPriority && highPriority.length > 0 ? (
+              <div className="space-y-2">
+                {highPriority.map((t) => {
+                  const statusCfg: Record<string, { label: string; color: string }> = {
+                    no_progress: { label: "To Do", color: "text-gray-500" },
+                    in_progress: { label: "In Progress", color: "text-warning-600" },
+                  };
+                  const st = statusCfg[t.status] || { label: t.status, color: "text-gray-500" };
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => router.push(`/projects/${t.project_id}?task=${t.id}`)}
+                      className="w-full text-left p-3 border border-gray-100 rounded-lg hover:border-danger-200 hover:shadow-sm transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-sm font-medium text-gray-900 truncate flex-1">{t.title}</p>
+                        <span className={cn("text-[10px] font-medium", st.color)}>{st.label}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-400">
+                        <span>{t.project_name}</span>
+                        {t.due_date && (
+                          <>
+                            <span>&middot;</span>
+                            <span>Due {new Date(t.due_date).toLocaleDateString()}</span>
+                          </>
+                        )}
+                      </div>
+                      {t.assignee_names.length > 0 && (
+                        <p className="text-xs text-gray-400 mt-1">{t.assignee_names.join(", ")}</p>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* Clients */}
         {clientsWithCounts && clientsWithCounts.length > 0 && (

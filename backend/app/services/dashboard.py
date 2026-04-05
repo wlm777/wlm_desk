@@ -4,9 +4,9 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Project, ProjectMember, Task, TaskAssignee, UserRole
-from app.models.enums import TaskStatus
+from app.models.enums import TaskPriority, TaskStatus
 from app.models.user import User
-from app.schemas.dashboard import DashboardSummary, StuckTask, WorkloadItem
+from app.schemas.dashboard import DashboardSummary, HighPriorityTask, ProjectProgress, StuckTask, WorkloadItem
 
 
 async def get_summary(db: AsyncSession, user: User) -> DashboardSummary:
@@ -186,3 +186,75 @@ async def get_stuck_tasks(
         ))
 
     return stuck
+
+
+async def get_high_priority_tasks(
+    db: AsyncSession, user: User, *, limit: int = 20
+) -> list[HighPriorityTask]:
+    """Get all active high-priority tasks visible to user."""
+    q = (
+        select(Task, Project.name.label("project_name"))
+        .join(Project, Project.id == Task.project_id)
+        .where(
+            Task.is_archived.is_(False),
+            Project.is_archived.is_(False),
+            Task.status != TaskStatus.completed,
+            Task.priority == TaskPriority.high,
+        )
+    )
+
+    if user.role != UserRole.admin:
+        user_projects = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
+        q = q.where(Task.project_id.in_(user_projects))
+
+    q = q.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc()).limit(min(limit, 50))
+    result = await db.execute(q)
+    rows = result.all()
+
+    items = []
+    for task, project_name in rows:
+        assignee_result = await db.execute(
+            select(User.full_name)
+            .join(TaskAssignee, TaskAssignee.user_id == User.id)
+            .where(TaskAssignee.task_id == task.id)
+        )
+        assignee_names = list(assignee_result.scalars().all())
+        items.append(HighPriorityTask(
+            id=task.id,
+            title=task.title,
+            project_id=task.project_id,
+            project_name=project_name,
+            status=task.status.value,
+            due_date=task.due_date,
+            assignee_names=assignee_names,
+        ))
+    return items
+
+
+async def get_project_progress(db: AsyncSession, user: User) -> list[ProjectProgress]:
+    """Get completed/total parent task counts per project (non-archived tasks only)."""
+    base = and_(
+        Task.is_archived.is_(False),
+        Project.is_archived.is_(False),
+    )
+
+    q = (
+        select(
+            Project.id.label("project_id"),
+            func.count(Task.id).label("total"),
+            func.count(Task.id).filter(Task.status == TaskStatus.completed).label("completed"),
+        )
+        .join(Task, Task.project_id == Project.id)
+        .where(base)
+        .group_by(Project.id)
+    )
+
+    if user.role != UserRole.admin:
+        user_projects = select(ProjectMember.project_id).where(ProjectMember.user_id == user.id)
+        q = q.where(Project.id.in_(user_projects))
+
+    result = await db.execute(q)
+    return [
+        ProjectProgress(project_id=row.project_id, total=row.total, completed=row.completed)
+        for row in result.all()
+    ]

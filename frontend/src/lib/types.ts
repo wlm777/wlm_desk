@@ -24,6 +24,7 @@ export interface User {
   notify_task_assigned: boolean;
   notify_subtask: boolean;
   notify_file_upload: boolean;
+  working_days: string;
   last_login_at: string | null;
   created_at: string;
   updated_at: string;
@@ -219,6 +220,22 @@ export interface StuckTask {
   due_date: string | null;
   last_activity_at: string;
   assignee_names: string[];
+}
+
+export interface HighPriorityTask {
+  id: string;
+  title: string;
+  project_id: string;
+  project_name: string;
+  status: string;
+  due_date: string | null;
+  assignee_names: string[];
+}
+
+export interface ProjectProgress {
+  project_id: string;
+  total: number;
+  completed: number;
 }
 
 export interface SavedFilter {

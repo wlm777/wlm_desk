@@ -7,8 +7,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Project, Task, TaskAssignee, User
-from app.models.enums import TaskStatus
-from app.services.slack_notify import _post_webhook
+from app.models.enums import TaskStatus, TaskPriority
+from app.services.slack_notify import _post_webhook, _is_working_day
+
+_DIGEST_PRIORITY_TAG = {
+    "high": " :sos:",
+    "medium": " :rocket:",
+    "low": " :pea_pod:",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +22,7 @@ logger = logging.getLogger(__name__)
 async def _query_new_tasks(db: AsyncSession, user: User) -> list[tuple]:
     """Tasks assigned to user that are not started (no_progress), not archived."""
     result = await db.execute(
-        select(Task.title, Project.name)
+        select(Task.title, Project.name, Task.priority)
         .join(TaskAssignee, TaskAssignee.task_id == Task.id)
         .join(Project, Project.id == Task.project_id)
         .where(
@@ -33,7 +39,7 @@ async def _query_new_tasks(db: AsyncSession, user: User) -> list[tuple]:
 async def _query_in_progress_tasks(db: AsyncSession, user: User) -> list[tuple]:
     """Tasks assigned to user that are in progress, not archived."""
     result = await db.execute(
-        select(Task.title, Project.name)
+        select(Task.title, Project.name, Task.priority)
         .join(TaskAssignee, TaskAssignee.task_id == Task.id)
         .join(Project, Project.id == Task.project_id)
         .where(
@@ -57,14 +63,16 @@ def _build_digest_payload(
 
     if new_tasks:
         lines = ["*New Tasks*"]
-        for title, project_name in new_tasks:
-            lines.append(f"  • {title} — _{project_name}_")
+        for title, project_name, priority in new_tasks:
+            ptag = _DIGEST_PRIORITY_TAG.get(priority.value if hasattr(priority, "value") else str(priority), "")
+            lines.append(f"  • {title} — _{project_name}_{ptag}")
         sections.append("\n".join(lines))
 
     if in_progress:
         lines = ["*In Progress*"]
-        for title, project_name in in_progress:
-            lines.append(f"  • {title} — _{project_name}_")
+        for title, project_name, priority in in_progress:
+            ptag = _DIGEST_PRIORITY_TAG.get(priority.value if hasattr(priority, "value") else str(priority), "")
+            lines.append(f"  • {title} — _{project_name}_{ptag}")
         sections.append("\n".join(lines))
 
     if not sections:
@@ -88,6 +96,10 @@ async def send_daily_digest(db: AsyncSession, user: User) -> bool:
     Returns True if message was sent, False otherwise.
     """
     if not user.slack_enabled or not user.slack_webhook_url:
+        return False
+
+    # Skip digest on non-working days
+    if not _is_working_day(user):
         return False
 
     has_any = user.notify_daily_new_tasks or user.notify_daily_in_progress

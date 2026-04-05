@@ -6,12 +6,13 @@ Next.js App Router with `(dashboard)` route group (requires auth).
 
 | Route | Page | Description |
 |-------|------|-------------|
-| `/` | Dashboard | Summary cards, workload, stuck tasks |
-| `/projects` | All Projects | Project cards with counts |
+| `/` | Dashboard | Summary cards, workload, stuck tasks, high-priority widget |
+| `/projects` | All Projects | Project cards with counts and progress bars |
 | `/projects/[id]` | Project | Task lists, filters, search, DnD |
 | `/tasks/[view]` | Aggregate Tasks | Cross-project views (my, overdue, etc.) |
 | `/account` | My Account | Profile, Slack, notifications |
-| `/users` | User Management | Admin user table/cards |
+| `/users` | User Management | Admin user table/cards, last activity display, right-side edit panel |
+| `/clients` | Clients | Client list with project counts (admin/manager CRUD, full-row clickable) |
 | `/system` | System Settings | Admin storage/image/digest config |
 | `/login` | Login | Email/password + Google OAuth |
 
@@ -19,7 +20,7 @@ Next.js App Router with `(dashboard)` route group (requires auth).
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| `Sidebar` | sidebar.tsx | Project selector, lists, views, nav, user menu |
+| `Sidebar` | sidebar.tsx | Project selector, starred projects, lists, views, nav, user menu |
 | `Header` | header.tsx | Global search, new task button |
 | `TaskDetailPanel` | task-detail-panel.tsx | Right panel: overview, subtasks, comments, files, activity |
 | `GlobalSearch` | global-search.tsx | Header search with dropdown results |
@@ -29,7 +30,10 @@ Next.js App Router with `(dashboard)` route group (requires auth).
 | `TimezonePicker` | timezone-picker.tsx | Searchable timezone dropdown |
 | `AvatarStack` | avatar-stack.tsx | Overlapping user avatars |
 | `ImageLightbox` | image-lightbox.tsx | Full-screen image preview |
-| `BatchToolbar` | batch-toolbar.tsx | Bulk task actions |
+| `BatchToolbar` | batch-toolbar.tsx | Bulk task actions (status, priority, delete) |
+| `CreateProjectModal` | create-project-modal.tsx | New project form with client and member selection |
+| `WorkingDaysPicker` | working-days-picker.tsx | ISO weekday toggle buttons for user working days |
+| `UserEditPanel` | user-edit-panel.tsx | Right-side panel (50% desktop, fullscreen mobile) with Profile, Password, Working Days, Slack, Notifications sections |
 
 ## State Management
 
@@ -45,6 +49,14 @@ Next.js App Router with `(dashboard)` route group (requires auth).
 - **Collapsible subtasks**: localStorage key `wlm:task:{id}:subtasks:expanded`
 - **Per-list pagination**: newest 30 tasks loaded first, "Load earlier tasks" fetches older
 - **Mobile responsive**: sidebar → drawer, task panel → fullscreen, tables → cards
+- **Mobile quick-add**: visible "Add" submit button on quick task and quick subtask inputs for mobile
+- **Desktop quick task Enter**: after assignee selection, focus returns to input so Enter works immediately
+- **Mobile sidebar**: safe-area-inset-bottom to prevent user panel being cut off by browser bottom bar
+- **Project header**: shows `client_name / project_name` where client_name links to that client's projects
+- **Project progress bars**: All Projects page shows completed/total task progress bar per project (non-archived parent tasks only)
+- **Dashboard high-priority widget**: widget showing all active high-priority tasks across accessible projects
+- **User edit panel**: right-side panel replaces popup modal (50% width on desktop, fullscreen on mobile), organized by sections: Profile, Password, Working Days, Slack, Notifications
+- **Clients page**: full row is clickable, opens client's projects
 
 ## Keyboard Navigation
 

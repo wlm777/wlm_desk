@@ -387,6 +387,13 @@ export default function ProjectPage() {
     queryFn: () => api.get(`/api/v1/projects/${projectId}/members`),
   });
 
+  // Fetch client name if project has a client
+  const { data: clientData } = useQuery<{ id: string; name: string }>({
+    queryKey: ["client", project?.client_id],
+    queryFn: () => api.get(`/api/v1/clients`).then((r: any) => r.items?.find((c: any) => c.id === project?.client_id)),
+    enabled: !!project?.client_id,
+  });
+
   const { data: starredData } = useQuery<{ id: string; project_id: string }[]>({
     queryKey: ["starred-projects"],
     queryFn: () => api.get("/api/v1/starred-projects"),
@@ -691,11 +698,24 @@ export default function ProjectPage() {
                 >
                   <Star className={cn("w-5 h-5", isStarred ? "text-warning-500 fill-warning-500" : "text-gray-300 hover:text-warning-400")} />
                 </button>
-                <h1
-                  className="text-xl font-semibold text-primary-600 hover:text-primary-700 cursor-pointer transition-colors"
-                  onClick={() => router.push(`/projects/${projectId}`)}
-                >
-                  {project.name}
+                <h1 className="text-xl font-semibold flex items-center gap-1.5">
+                  {clientData?.name && (
+                    <>
+                      <span
+                        className="text-gray-400 hover:text-primary-600 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/projects?client=${project.client_id}`)}
+                      >
+                        {clientData.name}
+                      </span>
+                      <span className="text-gray-300">/</span>
+                    </>
+                  )}
+                  <span
+                    className="text-primary-600 hover:text-primary-700 cursor-pointer transition-colors"
+                    onClick={() => router.push(`/projects/${projectId}`)}
+                  >
+                    {project.name}
+                  </span>
                 </h1>
                 {canEdit && (
                   <button
@@ -1007,6 +1027,8 @@ export default function ProjectPage() {
                                   autoFocus
                                   className="flex-1 text-[11px] bg-white border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
                                 />
+                                <button type="button" onClick={() => { if (newSubTitle.trim()) createSubtaskInline.mutate({ taskId: task.id, title: newSubTitle.trim() }); }}
+                                  disabled={!newSubTitle.trim()} className="sm:hidden px-2 py-0.5 text-[10px] font-medium text-white bg-primary-600 rounded disabled:opacity-50 shrink-0">Add</button>
                               </div>
                             ) : (
                               <button
@@ -1044,6 +1066,8 @@ export default function ProjectPage() {
                                   autoFocus
                                   className="flex-1 text-[11px] bg-white border border-gray-200 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-primary-500"
                                 />
+                                <button type="button" onClick={() => { if (newSubTitle.trim()) createSubtaskInline.mutate({ taskId: task.id, title: newSubTitle.trim() }); }}
+                                  disabled={!newSubTitle.trim()} className="sm:hidden px-2 py-0.5 text-[10px] font-medium text-white bg-primary-600 rounded disabled:opacity-50 shrink-0">Add</button>
                               </div>
                             ) : (
                               <button

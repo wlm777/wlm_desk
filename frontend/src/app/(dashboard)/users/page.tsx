@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Plus, Pencil, X, Check as CheckIcon, Eye, EyeOff, Copy, RefreshCw } from "lucide-react";
 import { Header } from "@/components/header";
 import { TimezonePicker } from "@/components/timezone-picker";
+import { WorkingDaysPicker } from "@/components/working-days-picker";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { validatePassword, isPasswordStrong } from "@/lib/password";
@@ -22,6 +23,7 @@ interface UserForm {
   role: string;
   timezone: string;
   password: string;
+  working_days: string;
   slack_webhook_url: string;
   slack_enabled: boolean;
 
@@ -37,7 +39,7 @@ interface UserForm {
 }
 
 const emptyForm: UserForm = {
-  full_name: "", email: "", role: "user", timezone: "UTC", password: "",
+  full_name: "", email: "", role: "user", timezone: "UTC", password: "", working_days: "1,2,3,4,5",
   slack_webhook_url: "", slack_enabled: false,
   notify_daily_new_tasks: true, notify_daily_in_progress: true,
   notify_comment: true, notify_task_created: true, notify_task_updated: true,
@@ -62,7 +64,7 @@ function generatePassword(): string {
 export default function UsersPage() {
   const queryClient = useQueryClient();
   const { user: currentUser } = useAuth();
-  const [showModal, setShowModal] = useState(false);
+  const [showPanel, setShowPanel] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [form, setForm] = useState<UserForm>(emptyForm);
   const [error, setError] = useState("");
@@ -82,7 +84,7 @@ export default function UsersPage() {
     mutationFn: (body: UserForm) => api.post("/api/v1/users", body as any),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      closeModal();
+      closePanel();
       setSuccessMsg("User created successfully");
       setTimeout(() => setSuccessMsg(""), 3000);
     },
@@ -93,7 +95,7 @@ export default function UsersPage() {
     mutationFn: ({ id, body }: { id: string; body: Record<string, any> }) => api.put(`/api/v1/users/${id}`, body),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      closeModal();
+      closePanel();
       setSuccessMsg("User updated successfully");
       setTimeout(() => setSuccessMsg(""), 3000);
     },
@@ -105,7 +107,7 @@ export default function UsersPage() {
       api.delete(`/api/v1/users/${id}`, rTo ? { reassign_to: rTo } : undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["users"] });
-      closeModal();
+      closePanel();
       setDeleteConfirm(false);
       setSuccessMsg("User deleted successfully");
       setTimeout(() => setSuccessMsg(""), 3000);
@@ -118,26 +120,26 @@ export default function UsersPage() {
     setForm({ ...emptyForm, password: generatePassword() });
     setShowPassword(true);
     setError("");
-    setShowModal(true);
+    setShowPanel(true);
   }
 
   function openEdit(u: User) {
     setEditingUser(u);
     setForm({
       full_name: u.full_name, email: u.email, role: u.role, timezone: u.timezone, password: "",
+      working_days: u.working_days || "1,2,3,4,5",
       slack_webhook_url: u.slack_webhook_url || "", slack_enabled: u.slack_enabled,
-
       notify_daily_new_tasks: u.notify_daily_new_tasks, notify_daily_in_progress: u.notify_daily_in_progress,
       notify_comment: u.notify_comment, notify_task_created: u.notify_task_created,
       notify_task_updated: u.notify_task_updated, notify_watcher: u.notify_watcher,
       notify_task_assigned: u.notify_task_assigned, notify_subtask: u.notify_subtask, notify_file_upload: u.notify_file_upload,
     });
     setError("");
-    setShowModal(true);
+    setShowPanel(true);
   }
 
-  function closeModal() {
-    setShowModal(false);
+  function closePanel() {
+    setShowPanel(false);
     setEditingUser(null);
     setForm(emptyForm);
     setError("");
@@ -163,14 +165,13 @@ export default function UsersPage() {
       if (form.email !== editingUser.email) body.email = form.email;
       if (form.role !== editingUser.role) body.role = form.role;
       if (form.timezone !== editingUser.timezone) body.timezone = form.timezone;
+      if (form.working_days !== (editingUser.working_days || "1,2,3,4,5")) body.working_days = form.working_days;
       if (form.password) {
         if (!isPasswordStrong(form.password)) { setError("Password does not meet requirements"); return; }
         body.password = form.password;
       }
-      // Slack + notification fields
       if (form.slack_webhook_url !== (editingUser.slack_webhook_url || "")) body.slack_webhook_url = form.slack_webhook_url || null;
       if (form.slack_enabled !== editingUser.slack_enabled) body.slack_enabled = form.slack_enabled;
-
       if (form.notify_daily_new_tasks !== editingUser.notify_daily_new_tasks) body.notify_daily_new_tasks = form.notify_daily_new_tasks;
       if (form.notify_daily_in_progress !== editingUser.notify_daily_in_progress) body.notify_daily_in_progress = form.notify_daily_in_progress;
       if (form.notify_comment !== editingUser.notify_comment) body.notify_comment = form.notify_comment;
@@ -202,179 +203,204 @@ export default function UsersPage() {
   return (
     <div className="flex flex-col h-full">
       <Header />
-      <div className="flex-1 p-3 sm:p-6 overflow-auto">
-        {successMsg && (
-          <div className="mb-4 px-4 py-2.5 bg-success-50 border border-success-100 text-success-700 text-sm rounded-lg flex items-center gap-2">
-            <CheckIcon className="w-4 h-4 shrink-0" />
-            {successMsg}
+      <div className="flex-1 flex overflow-hidden">
+        {/* User list */}
+        <div className={cn("flex-1 p-3 sm:p-6 overflow-auto transition-all", showPanel && "hidden sm:block sm:w-1/2")}>
+          {successMsg && (
+            <div className="mb-4 px-4 py-2.5 bg-success-50 border border-success-100 text-success-700 text-sm rounded-lg flex items-center gap-2">
+              <CheckIcon className="w-4 h-4 shrink-0" />
+              {successMsg}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-xl font-semibold text-gray-900">Users</h1>
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Add User
+            </button>
           </div>
-        )}
 
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-xl font-semibold text-gray-900">Users</h1>
-          <button
-            onClick={openCreate}
-            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            Add User
-          </button>
-        </div>
-
-        {/* Users table — desktop */}
-        <div className="hidden sm:block bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-100 text-left">
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">User</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">Email</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">Role</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">Timezone</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500">Status</th>
-                <th className="px-4 py-3 text-xs font-medium text-gray-500 w-16"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: u.color || "#7BAE8A" }}>
-                        {u.full_name.charAt(0)}
-                      </div>
-                      <div>
-                        <span className="text-sm text-gray-900 font-medium">{u.full_name}</span>
-                        <p className="text-[10px] text-gray-400">
-                          {u.last_login_at
-                            ? `Last activity: ${new Date(u.last_login_at).toLocaleString()}`
-                            : "Never logged in"}
-                        </p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn("text-[10px] font-medium px-2 py-1 rounded-full", ROLE_COLORS[u.role])}>
-                      {ROLE_LABELS[u.role]}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{u.timezone}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn("inline-flex items-center gap-1 text-xs", u.is_active ? "text-success-700" : "text-danger-500")}>
-                      <span className={cn("w-1.5 h-1.5 rounded-full", u.is_active ? "bg-success-500" : "bg-danger-500")} />
-                      {u.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => openEdit(u)} className="p-1 text-gray-400 hover:text-primary-600 rounded transition-colors" title="Edit user">
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
+          {/* Users table — desktop */}
+          <div className="hidden sm:block bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th className="px-4 py-3 text-xs font-medium text-gray-500">User</th>
+                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Email</th>
+                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Role</th>
+                  <th className="px-4 py-3 text-xs font-medium text-gray-500">Status</th>
+                  <th className="px-4 py-3 text-xs font-medium text-gray-500 w-16"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Users cards — mobile */}
-        <div className="sm:hidden space-y-2">
-          {users.map((u) => (
-            <div key={u.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3" onClick={() => openEdit(u)}>
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ backgroundColor: u.color || "#7BAE8A" }}>
-                {u.full_name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900 truncate">{u.full_name}</p>
-                <p className="text-xs text-gray-500 truncate">{u.email}</p>
-                <p className="text-[10px] text-gray-400 truncate">
-                  {u.last_login_at
-                    ? `Last activity: ${new Date(u.last_login_at).toLocaleString()}`
-                    : "Never logged in"}
-                </p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full", ROLE_COLORS[u.role])}>{ROLE_LABELS[u.role]}</span>
-                <span className={cn("w-2 h-2 rounded-full", u.is_active ? "bg-success-500" : "bg-danger-500")} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Create / Edit User Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 lg:mx-0" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-sm font-semibold">{editingUser ? "Edit User" : "Add User"}</h2>
-              <button onClick={closeModal} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Full name *</label>
-                <input type="text" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" autoFocus />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Email *</label>
-                <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
-                  <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
-                    <option value="user">User</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
-                  <TimezonePicker value={form.timezone} onChange={(tz) => setForm({ ...form, timezone: tz })} />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  {editingUser ? "New password (leave empty to keep)" : "Password *"}
-                </label>
-                <div className="relative flex items-center">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                    className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono"
-                    required={!editingUser}
-                  />
-                  <div className="absolute right-1.5 flex items-center gap-0.5">
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="p-1 text-gray-400 hover:text-gray-600 rounded" title={showPassword ? "Hide" : "Show"}>
-                      {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                    </button>
-                    <button type="button" onClick={() => { navigator.clipboard.writeText(form.password); }} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Copy">
-                      <Copy className="w-3.5 h-3.5" />
-                    </button>
-                    <button type="button" onClick={() => { setForm({ ...form, password: generatePassword() }); setShowPassword(true); }} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Generate new">
-                      <RefreshCw className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-                {form.password && (
-                  <div className="mt-2 space-y-0.5">
-                    {validatePassword(form.password).map((check) => (
-                      <div key={check.label} className="flex items-center gap-1.5">
-                        {check.valid ? <CheckIcon className="w-3 h-3 text-success-500" /> : <X className="w-3 h-3 text-gray-300" />}
-                        <span className={`text-[10px] ${check.valid ? "text-success-600" : "text-gray-400"}`}>{check.label}</span>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className={cn("border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer", editingUser?.id === u.id && "bg-primary-50")} onClick={() => openEdit(u)}>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0" style={{ backgroundColor: u.color || "#7BAE8A" }}>
+                          {u.full_name.charAt(0)}
+                        </div>
+                        <div>
+                          <span className="text-sm text-gray-900 font-medium">{u.full_name}</span>
+                          <p className="text-[10px] text-gray-400">
+                            {u.last_login_at
+                              ? `Last activity: ${new Date(u.last_login_at).toLocaleString()}`
+                              : "Never logged in"}
+                          </p>
+                        </div>
                       </div>
-                    ))}
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{u.email}</td>
+                    <td className="px-4 py-3">
+                      <span className={cn("text-[10px] font-medium px-2 py-1 rounded-full", ROLE_COLORS[u.role])}>
+                        {ROLE_LABELS[u.role]}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn("inline-flex items-center gap-1 text-xs", u.is_active ? "text-success-700" : "text-danger-500")}>
+                        <span className={cn("w-1.5 h-1.5 rounded-full", u.is_active ? "bg-success-500" : "bg-danger-500")} />
+                        {u.is_active ? "Active" : "Inactive"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Pencil className="w-3.5 h-3.5 text-gray-400" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Users cards — mobile */}
+          <div className="sm:hidden space-y-2">
+            {users.map((u) => (
+              <div key={u.id} className="bg-white border border-gray-200 rounded-lg p-3 flex items-center gap-3" onClick={() => openEdit(u)}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ backgroundColor: u.color || "#7BAE8A" }}>
+                  {u.full_name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-900 truncate">{u.full_name}</p>
+                  <p className="text-xs text-gray-500 truncate">{u.email}</p>
+                  <p className="text-[10px] text-gray-400 truncate">
+                    {u.last_login_at
+                      ? `Last activity: ${new Date(u.last_login_at).toLocaleString()}`
+                      : "Never logged in"}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={cn("text-[10px] font-medium px-2 py-0.5 rounded-full", ROLE_COLORS[u.role])}>{ROLE_LABELS[u.role]}</span>
+                  <span className={cn("w-2 h-2 rounded-full", u.is_active ? "bg-success-500" : "bg-danger-500")} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right-side panel */}
+        {showPanel && (
+          <div className="w-full sm:w-1/2 border-l border-gray-200 bg-white flex flex-col overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 shrink-0">
+              <div className="flex items-center gap-3">
+                {editingUser && (
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0" style={{ backgroundColor: editingUser.color || "#7BAE8A" }}>
+                    {editingUser.full_name.charAt(0)}
                   </div>
                 )}
+                <h2 className="text-sm font-semibold text-gray-900">{editingUser ? "Edit User" : "Add User"}</h2>
               </div>
+              <button onClick={closePanel} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-5">
+              {/* Profile section */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Profile</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Full name *</label>
+                    <input type="text" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" autoFocus />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Email *</label>
+                    <input type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
+                      <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+                        <option value="user">User</option>
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Timezone</label>
+                      <TimezonePicker value={form.timezone} onChange={(tz) => setForm({ ...form, timezone: tz })} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Password section */}
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Password</p>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    {editingUser ? "New password (leave empty to keep)" : "Password *"}
+                  </label>
+                  <div className="relative flex items-center">
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={form.password}
+                      onChange={(e) => setForm({ ...form, password: e.target.value })}
+                      className="w-full px-3 py-2 pr-24 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono"
+                      required={!editingUser}
+                    />
+                    <div className="absolute right-1.5 flex items-center gap-0.5">
+                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="p-1 text-gray-400 hover:text-gray-600 rounded" title={showPassword ? "Hide" : "Show"}>
+                        {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                      <button type="button" onClick={() => { navigator.clipboard.writeText(form.password); }} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Copy">
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <button type="button" onClick={() => { setForm({ ...form, password: generatePassword() }); setShowPassword(true); }} className="p-1 text-gray-400 hover:text-gray-600 rounded" title="Generate new">
+                        <RefreshCw className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                  {form.password && (
+                    <div className="mt-2 space-y-0.5">
+                      {validatePassword(form.password).map((check) => (
+                        <div key={check.label} className="flex items-center gap-1.5">
+                          {check.valid ? <CheckIcon className="w-3 h-3 text-success-500" /> : <X className="w-3 h-3 text-gray-300" />}
+                          <span className={`text-[10px] ${check.valid ? "text-success-600" : "text-gray-400"}`}>{check.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Working Days */}
+              {editingUser && (
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Working Days</p>
+                  <p className="text-[10px] text-gray-400 mb-2">Notifications suppressed on non-working days (except high-priority comments/subtasks)</p>
+                  <WorkingDaysPicker value={form.working_days} onChange={(val) => setForm({ ...form, working_days: val })} />
+                </div>
+              )}
 
               {/* Slack */}
               {editingUser && (
-                <div className="border-t border-gray-100 pt-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Slack</p>
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Slack</p>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-gray-700">Enable Slack</label>
                     <button type="button" onClick={() => setForm({ ...form, slack_enabled: !form.slack_enabled })}
@@ -393,13 +419,13 @@ export default function UsersPage() {
 
               {/* Notifications */}
               {editingUser && (
-                <div className="border-t border-gray-100 pt-3">
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Notifications</p>
+                <div className="border-t border-gray-100 pt-4">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Notifications</p>
                   {!form.slack_enabled && (
                     <p className="text-[10px] text-warning-700 bg-warning-50 px-2 py-1 rounded mb-2">Slack disabled — notifications won&apos;t be sent</p>
                   )}
                   <p className="text-[10px] text-gray-400 mb-1">Daily</p>
-                  <div className="space-y-1 mb-2">
+                  <div className="space-y-1 mb-3">
                     {([
                       { key: "notify_daily_new_tasks" as const, label: "New tasks" },
                       { key: "notify_daily_in_progress" as const, label: "In progress" },
@@ -443,32 +469,24 @@ export default function UsersPage() {
                 <div className="p-3 bg-danger-50 border border-danger-100 rounded-lg space-y-3">
                   <p className="text-xs font-medium text-danger-700">Delete user &quot;{editingUser.full_name}&quot;?</p>
                   <p className="text-[11px] text-gray-600">Choose what to do with their tasks and comments:</p>
-
                   <div className="space-y-2">
                     <label className="flex items-start gap-2 cursor-pointer">
-                      <input type="radio" name="deleteMode" checked={deleteMode === "keep"} onChange={() => { setDeleteMode("keep"); setReassignTo(""); }}
-                        className="mt-0.5" />
+                      <input type="radio" name="deleteMode" checked={deleteMode === "keep"} onChange={() => { setDeleteMode("keep"); setReassignTo(""); }} className="mt-0.5" />
                       <div>
                         <p className="text-xs text-gray-700">Keep tasks and comments as-is</p>
-                        <p className="text-[10px] text-gray-400">Remove assignments only, tasks stay with no owner</p>
+                        <p className="text-[10px] text-gray-400">Remove assignments only</p>
                       </div>
                     </label>
-
                     <label className="flex items-start gap-2 cursor-pointer">
-                      <input type="radio" name="deleteMode" checked={deleteMode === "reassign"} onChange={() => setDeleteMode("reassign")}
-                        className="mt-0.5" />
+                      <input type="radio" name="deleteMode" checked={deleteMode === "reassign"} onChange={() => setDeleteMode("reassign")} className="mt-0.5" />
                       <div>
                         <p className="text-xs text-gray-700">Reassign to another user</p>
                         <p className="text-[10px] text-gray-400">Transfer tasks, assignments, and comments</p>
                       </div>
                     </label>
-
                     {deleteMode === "reassign" && (
-                      <select
-                        value={reassignTo}
-                        onChange={(e) => setReassignTo(e.target.value)}
-                        className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ml-5"
-                      >
+                      <select value={reassignTo} onChange={(e) => setReassignTo(e.target.value)}
+                        className="w-full px-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 ml-5">
                         <option value="">Select user...</option>
                         {users.filter((u) => u.id !== editingUser.id && u.is_active).map((u) => (
                           <option key={u.id} value={u.id}>{u.full_name} ({u.email})</option>
@@ -476,40 +494,38 @@ export default function UsersPage() {
                       </select>
                     )}
                   </div>
-
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={() => setDeleteConfirm(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:bg-white rounded transition-colors">Cancel</button>
-                    <button
-                      type="button"
+                    <button type="button"
                       onClick={() => deleteUser.mutate({ id: editingUser.id, reassignTo: deleteMode === "reassign" ? reassignTo : undefined })}
                       disabled={deleteUser.isPending || (deleteMode === "reassign" && !reassignTo)}
-                      className="px-3 py-1.5 text-xs font-medium text-white bg-danger-600 rounded hover:bg-danger-700 disabled:opacity-50 transition-colors"
-                    >
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-danger-600 rounded hover:bg-danger-700 disabled:opacity-50 transition-colors">
                       {deleteUser.isPending ? "Deleting..." : "Delete User"}
                     </button>
                   </div>
                 </div>
               )}
-
-              <div className="flex items-center pt-2">
-                {editingUser && !deleteConfirm && editingUser.id !== currentUser?.id && (
-                  <button type="button" onClick={() => setDeleteConfirm(true)} className="text-xs text-danger-500 hover:text-danger-700 transition-colors">
-                    Delete User
-                  </button>
-                )}
-                <div className="flex-1" />
-                <div className="flex gap-2">
-                  <button type="button" onClick={closeModal} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                  <button type="submit" disabled={createUser.isPending || updateUser.isPending || (form.password ? !isPasswordStrong(form.password) : false)}
-                    className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">
-                    {(createUser.isPending || updateUser.isPending) ? "Saving..." : editingUser ? "Save" : "Create User"}
-                  </button>
-                </div>
-              </div>
             </form>
+
+            {/* Sticky footer */}
+            <div className="p-4 border-t border-gray-200 flex items-center shrink-0">
+              {editingUser && !deleteConfirm && editingUser.id !== currentUser?.id && (
+                <button type="button" onClick={() => setDeleteConfirm(true)} className="text-xs text-danger-500 hover:text-danger-700 transition-colors">
+                  Delete User
+                </button>
+              )}
+              <div className="flex-1" />
+              <div className="flex gap-2">
+                <button type="button" onClick={closePanel} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button onClick={handleSubmit} disabled={createUser.isPending || updateUser.isPending || (form.password ? !isPasswordStrong(form.password) : false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors">
+                  {(createUser.isPending || updateUser.isPending) ? "Saving..." : editingUser ? "Save" : "Create User"}
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

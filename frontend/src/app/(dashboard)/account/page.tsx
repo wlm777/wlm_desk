@@ -2,9 +2,10 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { User as UserIcon, Globe, Lock, Bell, Check, X, Pencil, MessageSquare } from "lucide-react";
+import { User as UserIcon, Globe, Lock, Bell, Check, X, Pencil, MessageSquare, CalendarDays } from "lucide-react";
 import { Header } from "@/components/header";
 import { TimezonePicker } from "@/components/timezone-picker";
+import { WorkingDaysPicker } from "@/components/working-days-picker";
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { validatePassword, isPasswordStrong } from "@/lib/password";
@@ -404,6 +405,21 @@ export default function AccountPage() {
                       <p className="text-xs text-warning-700">Slack is disabled — notifications will not be sent. Enable Slack in the Slack tab first.</p>
                     </div>
                   )}
+
+                  {/* Working Days */}
+                  <div className="mb-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-1.5 h-1.5 rounded-full bg-orange-500" />
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Working Days</h3>
+                    </div>
+                    <div className="pl-4 border-l-2 border-gray-100">
+                      <p className="text-[10px] text-gray-400 mb-2">Notifications are suppressed on non-working days (except high-priority comments/subtasks)</p>
+                      <WorkingDaysPicker
+                        value={user.working_days || "1,2,3,4,5"}
+                        onChange={(val) => updateProfile.mutate({ working_days: val } as any)}
+                      />
+                    </div>
+                  </div>
 
                   {/* Daily Digest */}
                   <div className="mb-6">

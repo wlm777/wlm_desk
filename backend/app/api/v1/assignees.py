@@ -74,6 +74,7 @@ async def assign_user(
             db, [data.user_id], "task_assigned", task.title,
             project.name if project else "", user.full_name,
             actor_id=user.id, project_id=task.project_id, task_id=task_id,
+            task_priority=task.priority.value,
         )
 
     return assignee

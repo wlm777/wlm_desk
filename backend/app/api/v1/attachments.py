@@ -74,7 +74,7 @@ async def upload_attachment(
         db, target_ids, "file_upload", task.title,
         project.name if project else "", user.full_name,
         actor_id=user.id, project_id=task.project_id, task_id=task_id,
-        detail=f"File: {file.filename}",
+        detail=f"File: {file.filename}", task_priority=task.priority.value,
     )
 
     return attachment_service.enrich_attachment(attachment)

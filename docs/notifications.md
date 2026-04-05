@@ -25,6 +25,7 @@ Stored on the `users` table:
 |-------|---------|----------|
 | `slack_enabled` | false | Master toggle |
 | `slack_webhook_url` | null | Webhook URL |
+| `working_days` | `"1,2,3,4,5"` | ISO weekday numbers (1=Mon, 7=Sun) |
 | `notify_daily_new_tasks` | true | Daily digest |
 | `notify_daily_in_progress` | true | Daily digest |
 | `notify_comment` | true | Realtime |
@@ -42,6 +43,11 @@ A notification is sent ONLY if ALL are true:
 2. `slack_webhook_url` is present and valid
 3. The specific preference flag for the event is `true`
 4. The target user is NOT the actor (no self-notifications)
+5. Today is one of the user's `working_days` **OR** the event is a high-priority comment or subtask update
+
+### Working Days Filtering
+
+Users can configure which days of the week they work via the `working_days` field (comma-separated ISO weekday numbers, default `"1,2,3,4,5"` for Mon-Fri). On non-working days, all notifications are suppressed **except** high-priority comments and subtask updates, which always come through regardless of the day.
 
 ## Event → Preference Mapping
 
@@ -59,6 +65,7 @@ A notification is sent ONLY if ALL are true:
 
 All messages include:
 - Slack emoji prefix (event-specific)
+- **Priority label**: `:sos: High Priority`, `:rocket: Medium Priority`, or `:pea_pod: Low Priority`
 - Actor name (bold)
 - Action label
 - Task title as **clickable link** to `{frontend_url}/projects/{project_id}?task={task_id}`
@@ -79,18 +86,18 @@ Hidden fields (not shown): `updated_at`, `updated_by_id`, `last_activity_at`, `s
 ### Examples
 
 ```
-:mega: *Peter* created task <link|Design review> in _WLM Desk_
+:mega: :rocket: Medium Priority — *Peter* created task <link|Design review> in _WLM Desk_
 
-:pencil2: *Alice* updated task <link|Fix auth> in _WLM Desk_
+:pencil2: :sos: High Priority — *Alice* updated task <link|Fix auth> in _WLM Desk_
 Status: :white_check_mark: Completed
 Priority: :large_orange_circle: High
 
-:speech_balloon: *Bob* commented on <link|API docs> in _WLM Desk_
+:speech_balloon: :pea_pod: Low Priority — *Bob* commented on <link|API docs> in _WLM Desk_
 
-:arrow_right: *Peter* updated subtask on <link|Auth module> in _WLM Desk_
+:arrow_right: :sos: High Priority — *Peter* updated subtask on <link|Auth module> in _WLM Desk_
 Completed: Write unit tests
 
-:paperclip: *Alice* uploaded a file to <link|API Docs> in _WLM Desk_
+:paperclip: :rocket: Medium Priority — *Alice* uploaded a file to <link|API Docs> in _WLM Desk_
 File: report.pdf
 ```
 
@@ -106,6 +113,7 @@ File: report.pdf
 - **New Tasks**: assigned to user, status = `no_progress`, not archived
 - **In Progress**: assigned to user, status = `in_progress`, not archived
 - Only includes sections the user has enabled
+- Each item shows a priority emoji (`:sos:`, `:rocket:`, or `:pea_pod:`) next to the task title
 
 ### Deduplication
 - `last_digest_at` (UTC) stored on user after successful send
@@ -115,11 +123,11 @@ File: report.pdf
 ```
 :clipboard: *Daily Digest* — Good morning, Peter!
 *New Tasks*
-  • Fix auth flow — _WLM Desk_
-  • Write tests — _WLM Desk_
+  • :sos: Fix auth flow — _WLM Desk_
+  • :pea_pod: Write tests — _WLM Desk_
 
 *In Progress*
-  • Design review — _WLM Desk_
+  • :rocket: Design review — _WLM Desk_
 
 _3 task(s) total_
 ```

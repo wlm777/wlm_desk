@@ -142,7 +142,11 @@ export default function ClientsPage() {
           {clients.map((c) => {
             const pCount = countMap.get(c.id) ?? 0;
             return (
-            <div key={c.id} className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-4 hover:shadow-sm transition-all">
+            <div
+              key={c.id}
+              className="bg-white border border-gray-200 rounded-lg p-4 flex items-center gap-4 hover:shadow-sm transition-all cursor-pointer"
+              onClick={() => router.push(`/projects?client=${c.id}`)}
+            >
               <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-primary-600 font-bold text-sm shrink-0">
                 {c.name.charAt(0)}
               </div>
@@ -154,14 +158,11 @@ export default function ClientsPage() {
                   {c.phone && <span>{c.phone}</span>}
                 </div>
               </div>
-              <button
-                onClick={() => router.push(`/projects?client=${c.id}`)}
-                className="text-xs text-gray-500 hover:text-primary-600 transition-colors shrink-0"
-              >
+              <span className="text-xs text-gray-500 shrink-0">
                 {pCount} project{pCount !== 1 ? "s" : ""}
-              </button>
+              </span>
               {canManage && (
-                <button onClick={() => openEdit(c)} className="p-1.5 text-gray-400 hover:text-primary-600 rounded transition-colors">
+                <button onClick={(e) => { e.stopPropagation(); openEdit(c); }} className="p-1.5 text-gray-400 hover:text-primary-600 rounded transition-colors">
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
               )}

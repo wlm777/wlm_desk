@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
 import { canCreateProject, canEditProject } from "@/lib/permissions";
 import { useState } from "react";
-import type { Project, PaginatedResponse } from "@/lib/types";
+import type { Project, PaginatedResponse, ProjectProgress } from "@/lib/types";
 
 export default function ProjectsPage() {
   const router = useRouter();
@@ -32,6 +32,12 @@ export default function ProjectsPage() {
     queryFn: () => api.get("/api/v1/clients?limit=100"),
     enabled: !!clientFilter,
   });
+
+  const { data: progressData } = useQuery<ProjectProgress[]>({
+    queryKey: ["project-progress"],
+    queryFn: () => api.get("/api/v1/dashboard/project-progress"),
+  });
+  const progressMap = new Map(progressData?.map((p) => [p.project_id, p]) ?? []);
   const filterClientName = clientsData?.items?.find((c) => c.id === clientFilter)?.name;
 
   const deleteProject = useMutation({
@@ -148,6 +154,24 @@ export default function ProjectsPage() {
                   </span>
                 )}
               </div>
+
+              {/* Progress bar */}
+              {(() => {
+                const prog = progressMap.get(p.id);
+                if (!prog || prog.total === 0) return null;
+                const pct = Math.round((prog.completed / prog.total) * 100);
+                return (
+                  <div className="mt-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] text-gray-400">{prog.completed}/{prog.total} tasks done</span>
+                      <span className="text-[10px] font-medium text-gray-500">{pct}%</span>
+                    </div>
+                    <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-success-500 rounded-full transition-all" style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })()}
 
               <p className="text-[10px] text-gray-400 mt-2">
                 Updated {formatDistanceToNow(new Date(p.updated_at), { addSuffix: true })}

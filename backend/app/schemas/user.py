@@ -25,6 +25,7 @@ class UserRead(BaseModel):
     is_active: bool
     color: str | None = None
     slack_user_id: str | None = None
+    working_days: str = "1,2,3,4,5"
     slack_webhook_url: str | None = None
     slack_enabled: bool = False
 
@@ -50,6 +51,7 @@ class UserUpdate(BaseModel):
     password: str | None = None
     role: UserRole | None = None
     timezone: str | None = None
+    working_days: str | None = None
     slack_webhook_url: str | None = None
     slack_enabled: bool | None = None
 
@@ -70,6 +72,7 @@ class ProfileUpdate(BaseModel):
     timezone: str | None = None
     password: str | None = None
     color: str | None = None
+    working_days: str | None = None
     slack_webhook_url: str | None = None
     slack_enabled: bool | None = None
 

@@ -21,6 +21,11 @@
 | Edit project (name, desc, members) | Yes | If member | No |
 | Delete project | Yes | If owner | No |
 | Archive project | Yes | If owner | No |
+| **Clients** | | | |
+| View clients | Yes | Yes | Yes |
+| Create client | Yes | Yes | No |
+| Edit client | Yes | Yes | No |
+| Delete (deactivate) client | Yes | Yes | No |
 | **Lists** | | | |
 | Create/edit/delete lists | Yes | If member | No |
 | **Tasks** | | | |
@@ -41,8 +46,9 @@ Controlled by `lib/permissions.ts`:
 
 - `canManageUsers(role)` — admin only
 - `canCreateProject(role)` — admin + manager
-- `canEditProject(role, isMember)` — admin always, manager if member
+- `canEditProject(role, isMember)` — admin always, manager if member, user never
 - `canManageLists(role, isMember)` — admin always, manager if member
+- Clients: `canManage` = admin or manager (inline check in clients page)
 
 ## Task Visibility (Important)
 

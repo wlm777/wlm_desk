@@ -24,6 +24,9 @@ class User(UUIDMixin, TimestampMixin, Base):
     last_digest_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Working days: comma-separated ISO weekday numbers (1=Mon, 7=Sun). Default Mon-Fri.
+    working_days: Mapped[str] = mapped_column(String(20), nullable=False, default="1,2,3,4,5", server_default="1,2,3,4,5")
+
     # Slack webhook notifications
     slack_webhook_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     slack_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")

@@ -170,6 +170,7 @@ async def create_task(
             db, [uid for uid in data.assignee_ids], "task_created", data.title,
             project.name if project else "", user.full_name,
             actor_id=user.id, project_id=project_id, task_id=task.id,
+            task_priority=task.priority.value,
         )
 
     result = await task_service.get_task_with_counts(db, task)
@@ -227,7 +228,7 @@ async def update_task(
             db, target_ids, "task_updated", task.title,
             project.name if project else "", user.full_name,
             actor_id=user.id, project_id=task.project_id, task_id=task.id,
-            changes=changes,
+            changes=changes, task_priority=task.priority.value,
         )
 
     return await task_service.get_task_with_counts(db, task)

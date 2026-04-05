@@ -31,3 +31,19 @@ class StuckTask(BaseModel):
     due_date: date | None
     last_activity_at: datetime
     assignee_names: list[str]
+
+
+class HighPriorityTask(BaseModel):
+    id: uuid.UUID
+    title: str
+    project_id: uuid.UUID
+    project_name: str
+    status: str
+    due_date: date | None
+    assignee_names: list[str]
+
+
+class ProjectProgress(BaseModel):
+    project_id: uuid.UUID
+    total: int
+    completed: int

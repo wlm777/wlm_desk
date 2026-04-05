@@ -31,7 +31,7 @@ mkdir -p /mnt/wlm-attachments
 chown 1000:1000 /mnt/wlm-attachments
 
 # Clone the project
-git clone <repo> /opt/wlm-desk
+git clone https://github.com/wlm777/wlm_desk.git /opt/wlm-desk
 cd /opt/wlm-desk
 ```
 

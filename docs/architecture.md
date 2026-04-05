@@ -43,10 +43,10 @@ wlm-desk/
 │   └── Dockerfile
 ├── frontend/
 │   ├── src/
-│   │   ├── app/(dashboard)/ # Page routes (App Router)
+│   │   ├── app/(dashboard)/ # Page routes (dashboard, projects, tasks, users, clients)
 │   │   ├── components/      # Reusable UI components
 │   │   ├── hooks/           # Custom React hooks
-│   │   └── lib/             # Utilities, types, constants
+│   │   └── lib/             # Utilities, types, constants, permissions
 │   └── Dockerfile
 ├── docker-compose.yml
 └── docs/
@@ -64,3 +64,7 @@ wlm-desk/
 - **Slack webhooks**: Per-user Incoming Webhook URLs for notifications (no shared bot token)
 - **Role-based task visibility**: `user` role sees only assigned/created tasks; `manager`/`admin` see all
 - **Keyboard-driven UX**: Full tree navigation, accordion toggles, panel tab switching via arrow keys
+- **Client management**: Projects can be linked to clients; soft-delete via `is_active` flag
+- **Starred projects**: Per-user favorites shown in sidebar for quick access
+- **Last activity tracking**: `last_login_at` updated on every authenticated request (throttled to 5 min intervals)
+- **Working days notification filtering**: per-user `working_days` field suppresses Slack notifications on non-working days, with exceptions for high-priority comments and subtask updates

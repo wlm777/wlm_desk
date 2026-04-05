@@ -1,4 +1,4 @@
-# WLM Desk
+# WLM Desk v1.0.2
 
 Internal task management system.
 
@@ -25,7 +25,7 @@ docker compose up --build
 
 | Service  | URL                    |
 |----------|------------------------|
-| Frontend | http://localhost:3000   |
+| Frontend | http://localhost:3001   |
 | Backend  | http://localhost:8000   |
 | API Docs | http://localhost:8000/docs |
 
@@ -47,7 +47,7 @@ Returns:
 ## Project Structure
 
 ```
-wlm-tasks/
+wlm-desk/
 ├── frontend/          # Next.js app
 │   ├── src/
 │   │   ├── app/       # Pages (App Router)
@@ -56,11 +56,15 @@ wlm-tasks/
 │   └── Dockerfile
 ├── backend/           # FastAPI app
 │   ├── app/
-│   │   ├── api/       # Route handlers
-│   │   ├── core/      # Configuration
+│   │   ├── api/v1/    # Route handlers (auth, users, projects, tasks, clients, starred, ...)
+│   │   ├── core/      # Configuration, deps, security
+│   │   ├── models/    # SQLAlchemy models
+│   │   ├── schemas/   # Pydantic schemas
+│   │   ├── services/  # Business logic
 │   │   └── db/        # Database session
+│   ├── alembic/       # Database migrations (001-017)
 │   └── Dockerfile
-├── infra/             # Infrastructure configs
+├── docs/              # Project documentation
 ├── .env               # Environment variables
 └── docker-compose.yml
 ```

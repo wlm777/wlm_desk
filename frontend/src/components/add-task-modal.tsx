@@ -96,10 +96,9 @@ export function AddTaskModal({ projectId, defaultListId, onClose }: AddTaskModal
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
       <div
         className="bg-white rounded-xl shadow-xl w-full max-w-4xl max-h-[85vh] mx-4 lg:mx-0 flex flex-col"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between p-4 border-b border-gray-200 shrink-0">
           <h2 className="text-sm font-semibold">New Task</h2>

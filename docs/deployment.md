@@ -32,7 +32,7 @@ docker compose up -d --build
 
 3. Create admin user (via API or seed script)
 
-4. Access the app at `http://localhost:3000`
+4. Access the app at `http://localhost:3001`
 
 ## Environment Variables
 
@@ -104,7 +104,7 @@ docker compose exec backend alembic current
 docker compose exec backend alembic revision --autogenerate -m "description"
 ```
 
-Current migrations: `001` through `014`.
+Current migrations: `001` through `017` (015: clients + starred_projects, 016: last_login_at, 017: add working_days to users).
 
 Ports are configured in `.env`:
 - `FRONTEND_PORT=3001` (mapped to container port 3000)
@@ -122,3 +122,19 @@ Ports are configured in `.env`:
 - Consider Redis persistence if using it for more than cache
 - Set `FRONTEND_URL` to your public frontend URL for correct Slack notification links
 - CORS: currently `allow_origins=["*"]`, `allow_credentials=False` (uses Bearer tokens, not cookies)
+
+## Production Deploy Flow
+
+Production server: `desk.weblabmedia.eu` (141.94.42.72), project at `/opt/wlm-desk`.
+
+Deploy via GitHub push:
+
+```bash
+# Local: commit and push
+git push origin main
+
+# On production server via SSH:
+cd /opt/wlm-desk && git pull origin main && docker compose up -d --build
+```
+
+Migrations run automatically via `entrypoint.sh` (`alembic upgrade head` on backend start).

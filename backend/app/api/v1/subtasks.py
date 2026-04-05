@@ -58,7 +58,7 @@ async def create_subtask(
         db, target_ids, "subtask", task.title,
         project.name if project else "", user.full_name,
         actor_id=user.id, project_id=task.project_id, task_id=task_id,
-        detail=f"Added: {data.title}",
+        detail=f"Added: {data.title}", task_priority=task.priority.value,
     )
 
     return subtask
@@ -139,7 +139,7 @@ async def toggle_subtask(
             db, target_ids, "subtask", task.title,
             project.name if project else "", user.full_name,
             actor_id=user.id, project_id=task.project_id, task_id=task.id,
-            detail=f"{status_label}: {subtask.title}",
+            detail=f"{status_label}: {subtask.title}", task_priority=task.priority.value,
         )
 
     return subtask

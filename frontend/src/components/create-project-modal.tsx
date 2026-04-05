@@ -70,8 +70,8 @@ export function CreateProjectModal({ onClose }: CreateProjectModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center" onClick={onClose}>
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/30 z-50 flex items-center justify-center">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 shrink-0">
           <h2 className="text-sm font-semibold">New Project</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600">

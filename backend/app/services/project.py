@@ -71,7 +71,7 @@ async def get_projects(
         count_q = count_q.where(Project.is_archived.is_(False))
 
     total = (await db.execute(count_q)).scalar() or 0
-    result = await db.execute(q.order_by(Project.created_at.desc()).offset(offset).limit(limit))
+    result = await db.execute(q.order_by(Project.updated_at.desc()).offset(offset).limit(limit))
     return list(result.scalars().all()), total
 
 
